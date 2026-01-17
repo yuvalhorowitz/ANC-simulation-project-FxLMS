@@ -1,0 +1,92 @@
+============================================================
+ANC Simulation Playground - Instructions
+============================================================
+
+REQUIREMENTS
+------------
+1. Python 3.8 or higher
+2. Install dependencies:
+
+   cd /Users/adminaccount/Documents/personal/Finals\ Project/ANC-simulation-project-FxLMS
+   pip install -r requirements.txt
+
+   Required packages:
+   - numpy
+   - scipy
+   - pyroomacoustics
+   - matplotlib
+   - streamlit
+   - plotly
+
+
+RUNNING THE PLAYGROUND
+----------------------
+1. Open terminal
+
+2. Navigate to the playground folder:
+
+   cd /Users/adminaccount/Documents/personal/Finals\ Project/ANC-simulation-project-FxLMS/playground
+
+3. Run with Streamlit:
+
+   streamlit run app.py
+
+4. A browser window will open automatically at http://localhost:8501
+
+
+USING THE PLAYGROUND
+--------------------
+1. SIDEBAR (Left Panel)
+   - Room Preset: Select car type (Compact, Sedan, SUV) or room type
+   - Room Dimensions: Adjust length, width, height
+   - Absorption: Wall absorption coefficient (0-1)
+   - Max Reflection Order: Number of sound reflections to simulate
+   - FxLMS Parameters: Filter length, step size
+   - Duration: Simulation length in seconds
+
+2. INTERACTIVE ROOM LAYOUT (Main Area)
+   - Use sliders to position each component:
+     * Noise Source (red square)
+     * Reference Mic (blue triangle)
+     * Speaker (green circle)
+     * Error Mic (purple diamond)
+   - The diagram updates in real-time as you move components
+   - Positions are shown in meters (x, y, z)
+
+3. RUN SIMULATION
+   - Click "Run Simulation" button in the sidebar
+   - Wait for simulation to complete (progress bar shows status)
+   - Results appear with noise reduction in dB
+
+4. RESULTS TABS
+   - Visualizations: Before/after waveforms, spectrum, convergence, filter
+   - Audio: Listen to original noise vs. with ANC applied
+   - Room Layout: See final component positions
+
+
+TROUBLESHOOTING
+---------------
+- If streamlit not found: pip install streamlit
+- If port 8501 is busy: streamlit run app.py --server.port 8502
+- If browser doesn't open: manually go to http://localhost:8501
+
+
+RUNNING SIMULATIONS (Command Line)
+----------------------------------
+To run the step simulations directly without the GUI:
+
+   cd /Users/adminaccount/Documents/personal/Finals\ Project/ANC-simulation-project-FxLMS/simulations_pyroom
+
+   python3 step1_room_acoustics.py      # Room acoustics basics
+   python3 step2_microphones.py         # Microphone placement
+   python3 step3_superposition.py       # Destructive interference
+   python3 step4_anc_ideal.py           # Ideal ANC
+   python3 step5_anc_latency.py         # Latency effects
+   python3 step6_fxlms.py               # FxLMS algorithm
+   python3 step7_car_interior.py        # Car interior ANC
+   python3 step8_placement_optimization.py  # Mic placement optimization (4-speaker)
+
+Output files are saved to:
+   - output/plots/   (PNG images)
+   - output/audio/   (WAV files)
+   - output/data/    (CSV and JSON results)

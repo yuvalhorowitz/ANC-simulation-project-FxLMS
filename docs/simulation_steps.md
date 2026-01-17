@@ -273,60 +273,65 @@ Step 7: "Applied to real car noise" (practical system)
 
 ---
 
-## Step 8: Microphone Placement Optimization
+## Step 8: Microphone Placement Optimization (4-Speaker ANC)
 **File:** `simulations_pyroom/step8_placement_optimization.py`
 
 ### Concept
-Finds **optimal reference and error microphone locations** when using existing car stereo speakers for anti-noise generation. This answers the practical question: given a car's existing speakers, where should we place the microphones?
+Finds **optimal reference and error microphone locations** when using **4 car stereo speakers simultaneously** for anti-noise generation. All speakers work together to create a combined anti-noise field.
 
 ### How It Works
-1. Defines all possible speaker positions (car stereo locations)
-2. Defines candidate reference mic positions (noise detection)
-3. Defines candidate error mic positions (listener locations)
-4. Tests all combinations across driving scenarios
-5. Analyzes results to find optimal placements
+1. Uses 4 fixed speakers (front doors + dashboard)
+2. Tests multiple reference mic positions
+3. Tests multiple error mic positions
+4. Runs across 5 different noise types/locations
+5. Analyzes which mic placements work best
 
-### Speaker Positions Tested
-| Position | Location | Rationale |
-|----------|----------|-----------|
-| Door Left | [2.0, 0.1, 0.4] | Common in all cars |
-| Door Right | [2.0, 1.75, 0.4] | Passenger side |
-| Dashboard Left | [0.8, 0.25, 0.9] | A-pillar tweeter |
-| Dashboard Center | [0.8, 0.92, 0.85] | Center stack |
-| Headrest Driver | [3.2, 0.55, 1.0] | Premium systems |
-| Rear Left | [4.0, 0.40, 0.9] | Rear deck |
+### Fixed 4-Speaker Configuration
+| Speaker | Position | Location |
+|---------|----------|----------|
+| front_left | [2.0, 0.1, 0.4] | Driver door |
+| front_right | [2.0, 1.75, 0.4] | Passenger door |
+| dash_left | [0.8, 0.25, 0.9] | Dashboard driver |
+| dash_right | [0.8, 1.60, 0.9] | Dashboard passenger |
+
+### Noise Types Tested
+| Noise Type | Source Position | Description |
+|------------|-----------------|-------------|
+| Engine | [0.3, 0.92, 0.4] | Low freq from firewall |
+| Road (Front) | [0.8, 0.92, 0.15] | Tire noise front wheels |
+| Road (Rear) | [3.8, 0.92, 0.15] | Tire noise rear wheels |
+| Wind | [0.6, 0.92, 1.0] | Windshield/A-pillar |
+| Combined | [0.5, 0.92, 0.5] | Highway mix |
 
 ### Reference Microphone Candidates
 | Position | Location | Best For |
 |----------|----------|----------|
-| Firewall | [0.3, 0.92, 0.5] | Engine noise |
-| Dashboard | [0.9, 0.92, 0.8] | General pickup |
-| A-Pillar | [0.7, 0.15, 1.0] | Wind/road noise |
-| Under Seat | [2.5, 0.55, 0.15] | Road noise |
+| firewall_center | [0.3, 0.92, 0.5] | Engine noise |
+| firewall_driver | [0.3, 0.45, 0.5] | Engine (driver side) |
+| dashboard | [0.9, 0.92, 0.8] | General pickup |
+| a_pillar_left | [0.7, 0.15, 1.0] | Wind noise |
+| under_driver_seat | [2.5, 0.55, 0.15] | Road noise |
+| floor_front_left | [1.0, 0.15, 0.1] | Tire noise |
 
 ### Error Microphone Candidates
 | Position | Location | Target |
 |----------|----------|--------|
-| Driver Headrest | [3.2, 0.55, 1.0] | Primary listener |
-| Driver Ear Left | [3.2, 0.40, 1.0] | Precise targeting |
-| Driver Ear Right | [3.2, 0.70, 1.0] | Binaural |
-| Passenger Headrest | [3.2, 1.30, 1.0] | Passenger comfort |
+| driver_headrest | [3.2, 0.55, 1.0] | Primary listener |
+| driver_ear_left | [3.2, 0.40, 1.0] | Left ear |
+| driver_ear_right | [3.2, 0.70, 1.0] | Right ear |
+| passenger_headrest | [3.2, 1.30, 1.0] | Passenger |
+| center_cabin | [2.5, 0.92, 0.9] | Cabin center |
+| rearview_mirror | [1.5, 0.92, 1.1] | Central location |
 
-### Key Finding
-```
-Optimal configuration:
-- Speaker: Headrest (closest to ear)
-- Reference mic: Firewall (earliest noise detection)
-- Error mic: Driver headrest (at listener)
-
-This achieves 15-20 dB reduction vs 5-10 dB for door speakers
-```
+### Test Matrix
+- 8 reference mic positions × 6 error mic positions × 5 noise types = **240 tests**
 
 ### Outputs
 - `output/data/pyroom_step8_sweep_results.csv` - Full results table
 - `output/data/pyroom_step8_analysis.json` - Rankings and recommendations
-- `output/plots/pyroom_step8_heatmap_*.png` - Performance heatmaps
-- `output/plots/pyroom_step8_speaker_comparison.png` - Speaker rankings
+- `output/plots/pyroom_step8_heatmap_*.png` - Heatmap per noise type
+- `output/plots/pyroom_step8_mic_rankings.png` - Ref/Error mic rankings
+- `output/plots/pyroom_step8_noise_comparison.png` - Performance by noise type
 - `output/plots/pyroom_step8_top_configurations.png` - Top 10 configurations
 
 ---
