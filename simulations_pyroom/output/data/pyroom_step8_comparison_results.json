@@ -1,0 +1,113 @@
+{
+  "engine": {
+    "headrest": {
+      "name": "Headrest Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 5.905323407591171,
+      "nr_max": 11.76431876016931
+    },
+    "door": {
+      "name": "Door Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 8.262522036640467,
+      "nr_max": 13.748086484465315
+    },
+    "dashboard": {
+      "name": "Dashboard Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 4.913935562547915,
+      "nr_max": 13.077478185443109
+    },
+    "rear": {
+      "name": "Rear Shelf Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 4.1621042598859725,
+      "nr_max": 13.219750282503346
+    },
+    "stereo_4": {
+      "name": "4-Speaker Stereo",
+      "type": "4-speaker",
+      "nr_at_ear": 0,
+      "nr_mean": 8.18341560527796,
+      "nr_max": 16.671119673919346
+    }
+  },
+  "road": {
+    "headrest": {
+      "name": "Headrest Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 7.469838222984497,
+      "nr_max": 11.330402589440995
+    },
+    "door": {
+      "name": "Door Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 6.05344172117885,
+      "nr_max": 11.582428088426324
+    },
+    "dashboard": {
+      "name": "Dashboard Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 9.598903932018683,
+      "nr_max": 15.445809147175469
+    },
+    "rear": {
+      "name": "Rear Shelf Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 10.238988332260634,
+      "nr_max": 16.269279380673286
+    },
+    "stereo_4": {
+      "name": "4-Speaker Stereo",
+      "type": "4-speaker",
+      "nr_at_ear": 0,
+      "nr_mean": 9.975866147711601,
+      "nr_max": 14.723867327351412
+    }
+  },
+  "highway": {
+    "headrest": {
+      "name": "Headrest Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 5.376468397004747,
+      "nr_max": 12.452800197360961
+    },
+    "door": {
+      "name": "Door Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 3.7002498333343996,
+      "nr_max": 7.346534638328447
+    },
+    "dashboard": {
+      "name": "Dashboard Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 3.1876015061374363,
+      "nr_max": 7.860531363437991
+    },
+    "rear": {
+      "name": "Rear Shelf Speaker",
+      "type": "single",
+      "nr_at_ear": 0,
+      "nr_mean": 3.0208926575001587,
+      "nr_max": 9.902583799858874
+    },
+    "stereo_4": {
+      "name": "4-Speaker Stereo",
+      "type": "4-speaker",
+      "nr_at_ear": 0,
+      "nr_mean": 3.566015981930783,
+      "nr_max": 9.489926575461064
+    }
+  }
+}
