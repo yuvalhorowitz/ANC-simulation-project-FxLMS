@@ -411,3 +411,97 @@ def print_config_summary(config: dict, step_name: str):
         if noise['type'] == 'tonal':
             freqs = noise.get('frequencies', [])
             print(f"  Frequencies: {freqs} Hz")
+
+
+# =============================================================================
+# STEP 8: Microphone Placement Optimization
+# =============================================================================
+# Goal: Find optimal speaker and microphone positions for car ANC
+# Uses existing car stereo speakers as anti-noise sources
+
+STEP8_CONFIGS = {
+    'config_A': {
+        'name': 'Headrest Speaker - Optimal',
+        'description': 'Best configuration: headrest speaker closest to listener ear',
+        'room': {
+            'dimensions': [4.5, 1.85, 1.2],
+            'materials': {
+                'ceiling': 0.38,
+                'floor': 0.52,
+                'east': 0.14,
+                'west': 0.14,
+                'north': 0.20,
+                'south': 0.30,
+            },
+            'max_order': 3,
+        },
+        'positions': {
+            'noise_source': [0.3, 0.92, 0.4],
+            'reference_mic': [0.3, 0.92, 0.5],    # Firewall center
+            'speaker': [3.2, 0.55, 1.0],          # Driver headrest
+            'error_mic': [3.2, 0.55, 1.0],        # Driver headrest
+        },
+        'scenario': 'highway',
+        'fxlms': {
+            'filter_length': 256,
+            'step_size': 0.005,
+            'duration': 5.0,
+        },
+    },
+    'config_B': {
+        'name': 'Door Speaker - Common Setup',
+        'description': 'Using front door speaker (common in most cars)',
+        'room': {
+            'dimensions': [4.5, 1.85, 1.2],
+            'materials': {
+                'ceiling': 0.38,
+                'floor': 0.52,
+                'east': 0.14,
+                'west': 0.14,
+                'north': 0.20,
+                'south': 0.30,
+            },
+            'max_order': 3,
+        },
+        'positions': {
+            'noise_source': [0.3, 0.92, 0.4],
+            'reference_mic': [0.9, 0.92, 0.8],    # Dashboard
+            'speaker': [2.0, 0.1, 0.4],           # Door left
+            'error_mic': [3.2, 0.55, 1.0],        # Driver headrest
+        },
+        'scenario': 'city',
+        'fxlms': {
+            'filter_length': 256,
+            'step_size': 0.005,
+            'duration': 5.0,
+        },
+    },
+    'config_C': {
+        'name': 'Dashboard Speaker - Wind Noise',
+        'description': 'Dashboard speaker for wind noise cancellation',
+        'room': {
+            'dimensions': [4.5, 1.85, 1.2],
+            'materials': {
+                'ceiling': 0.38,
+                'floor': 0.52,
+                'east': 0.14,
+                'west': 0.14,
+                'north': 0.20,
+                'south': 0.30,
+            },
+            'max_order': 3,
+        },
+        'positions': {
+            'noise_source': [0.6, 0.92, 1.0],     # Windshield area
+            'reference_mic': [0.7, 0.15, 1.0],    # A-pillar left
+            'speaker': [0.8, 0.25, 0.9],          # Dash left
+            'error_mic': [3.2, 0.40, 1.0],        # Driver left ear
+        },
+        'scenario': 'highway',
+        'fxlms': {
+            'filter_length': 256,
+            'step_size': 0.005,
+            'duration': 5.0,
+        },
+    },
+}

@@ -121,9 +121,7 @@ def main():
             if st.button("⚙️ Change Configuration", use_container_width=True):
                 del st.session_state.results
                 del st.session_state.params
-                # Reset interactive positions to allow fresh editing
-                if 'interactive_positions' in st.session_state:
-                    del st.session_state.interactive_positions
+                # Keep interactive_positions so user can continue editing from current state
                 st.rerun()
 
         # Metrics row

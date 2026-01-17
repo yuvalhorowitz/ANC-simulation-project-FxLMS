@@ -1,0 +1,73 @@
+success,noise_reduction_db,convergence_time_s,final_mse,time_budget_ms,primary_distance_m,secondary_distance_m,speaker,ref_mic,error_mic,scenario,error
+True,12.242115239425718,0.263625,0.005357949466838178,8.409454800605175,2.984442996607575,0.0,headrest_driver,firewall_center,driver_headrest,highway,
+True,22.155160698041186,0.11,0.0013596957999635541,8.409454800605175,2.984442996607575,0.0,headrest_driver,firewall_center,driver_headrest,city,
+True,31.25618235423817,0.0571875,0.0012186405366011064,8.409454800605175,2.984442996607575,0.0,headrest_driver,firewall_center,driver_headrest,acceleration,
+True,9.660453374745924,0.45825,0.003822391946569238,8.0371014400854,3.0067257939492924,0.15000000000000002,headrest_driver,firewall_center,driver_ear_left,highway,
+True,24.25010178440092,0.1113125,0.0021277415866798243,8.0371014400854,3.0067257939492924,0.15000000000000002,headrest_driver,firewall_center,driver_ear_left,city,
+True,28.52744901362792,0.0640625,0.0023164945584448335,8.0371014400854,3.0067257939492924,0.15000000000000002,headrest_driver,firewall_center,driver_ear_left,acceleration,
+True,1.205768787550295,0.178125,0.0432814946658916,6.598637730363783,2.984442996607575,0.0,headrest_driver,dashboard,driver_headrest,highway,
+True,7.087175011355564,0.3874375,0.03333289361907478,6.598637730363783,2.984442996607575,0.0,headrest_driver,dashboard,driver_headrest,city,
+True,13.372573599244868,0.071875,0.03202399463997298,6.598637730363783,2.984442996607575,0.0,headrest_driver,dashboard,driver_headrest,acceleration,
+True,5.647323161600124,0.2095,0.03866085482364925,6.226284369844008,3.0067257939492924,0.15000000000000002,headrest_driver,dashboard,driver_ear_left,highway,
+True,10.394297499261082,0.348875,0.05929678065532429,6.226284369844008,3.0067257939492924,0.15000000000000002,headrest_driver,dashboard,driver_ear_left,city,
+True,28.779248733867682,0.080125,0.004220526536670032,6.226284369844008,3.0067257939492924,0.15000000000000002,headrest_driver,dashboard,driver_ear_left,acceleration,
+True,6.192937168310445,0.2770625,0.007931669550980033,5.625370962032472,2.984442996607575,0.0,headrest_driver,a_pillar_left,driver_headrest,highway,
+True,12.432984306517376,0.091375,0.014761847768541269,5.625370962032472,2.984442996607575,0.0,headrest_driver,a_pillar_left,driver_headrest,city,
+True,18.49907956248067,0.045875,0.009372011059698008,5.625370962032472,2.984442996607575,0.0,headrest_driver,a_pillar_left,driver_headrest,acceleration,
+True,9.373654590451528,0.1143125,0.014185237983480198,5.253017601512697,3.0067257939492924,0.15000000000000002,headrest_driver,a_pillar_left,driver_ear_left,highway,
+True,17.65267598240291,0.1085,0.00829272399899346,5.253017601512697,3.0067257939492924,0.15000000000000002,headrest_driver,a_pillar_left,driver_ear_left,city,
+True,19.88146086648318,0.0461875,0.006739559661518299,5.253017601512697,3.0067257939492924,0.15000000000000002,headrest_driver,a_pillar_left,driver_ear_left,acceleration,
+True,6.564436065045954,0.2710625,0.011601648211266002,4.28380707521599,2.984442996607575,1.4150971698084907,door_left,firewall_center,driver_headrest,highway,
+True,17.757306292805715,0.0688125,0.010228033794997655,4.28380707521599,2.984442996607575,1.4150971698084907,door_left,firewall_center,driver_headrest,city,
+True,22.91142059290926,0.0454375,0.008984210261627306,4.28380707521599,2.984442996607575,1.4150971698084907,door_left,firewall_center,driver_headrest,acceleration,
+True,8.392229255266072,0.178375,0.011956451798662688,4.466335526129854,3.0067257939492924,1.3747727084867523,door_left,firewall_center,driver_ear_left,highway,
+True,19.889099382925718,0.0703125,0.006684408239436028,4.466335526129854,3.0067257939492924,1.3747727084867523,door_left,firewall_center,driver_ear_left,city,
+True,20.049018598551758,0.0406875,0.014616690413016078,4.466335526129854,3.0067257939492924,1.3747727084867523,door_left,firewall_center,driver_ear_left,acceleration,
+True,3.5774960776394806,0.13425,0.07357327370166666,2.4729900049745965,2.984442996607575,1.4150971698084907,door_left,dashboard,driver_headrest,highway,
+True,8.034359331455336,0.20275,0.05565815622998926,2.4729900049745965,2.984442996607575,1.4150971698084907,door_left,dashboard,driver_headrest,city,
+True,25.39601346453764,0.07675,0.001200663669022077,2.4729900049745965,2.984442996607575,1.4150971698084907,door_left,dashboard,driver_headrest,acceleration,
+True,2.0273817934028724,0.08925,0.047787403323817465,2.6555184558884606,3.0067257939492924,1.3747727084867523,door_left,dashboard,driver_ear_left,highway,
+True,10.308681948369019,0.2919375,0.057209475990767526,2.6555184558884606,3.0067257939492924,1.3747727084867523,door_left,dashboard,driver_ear_left,city,
+True,22.242032021123958,0.5976875,0.004760546869841409,2.6555184558884606,3.0067257939492924,1.3747727084867523,door_left,dashboard,driver_ear_left,acceleration,
+True,5.608303022399457,0.1545,0.036409477818803014,1.4997232366432862,2.984442996607575,1.4150971698084907,door_left,a_pillar_left,driver_headrest,highway,
+True,15.438469720108078,0.091625,0.027117866921445247,1.4997232366432862,2.984442996607575,1.4150971698084907,door_left,a_pillar_left,driver_headrest,city,
+True,15.680250918555316,0.0376875,0.0338592454564765,1.4997232366432862,2.984442996607575,1.4150971698084907,door_left,a_pillar_left,driver_headrest,acceleration,
+True,5.226201559300048,0.048875,0.056034454759096346,1.6822516875571503,3.0067257939492924,1.3747727084867523,door_left,a_pillar_left,driver_ear_left,highway,
+True,15.6170210193582,0.074875,0.007920750719699273,1.6822516875571503,3.0067257939492924,1.3747727084867523,door_left,a_pillar_left,driver_ear_left,city,
+True,12.100876443438011,0.038375,0.048975156507142584,1.6822516875571503,3.0067257939492924,1.3747727084867523,door_left,a_pillar_left,driver_ear_left,acceleration,
+True,2.1624714013912207,0.0484375,0.024313528854010776,1.3518930298120537,2.984442996607575,2.420743687382041,dash_left,firewall_center,driver_headrest,highway,
+True,22.847593078185284,0.1348125,0.0022316342613834424,1.3518930298120537,2.984442996607575,2.420743687382041,dash_left,firewall_center,driver_headrest,city,
+True,26.66622782003069,0.0699375,0.0022804335468030812,1.3518930298120537,2.984442996607575,2.420743687382041,dash_left,firewall_center,driver_headrest,acceleration,
+True,2.0024646474702816,0.027125,0.05453266669162496,1.45762240419109,3.0067257939492924,2.4067613093117486,dash_left,firewall_center,driver_ear_left,highway,
+True,21.747025479496024,0.110875,0.0024012828321899825,1.45762240419109,3.0067257939492924,2.4067613093117486,dash_left,firewall_center,driver_ear_left,city,
+True,22.650272284051994,0.0601875,0.005827910455651584,1.45762240419109,3.0067257939492924,2.4067613093117486,dash_left,firewall_center,driver_ear_left,acceleration,
+False,-999.0,-1.0,-1.0,,,,dash_left,dashboard,driver_headrest,highway,Negative time budget: -0.46ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,dashboard,driver_headrest,city,Negative time budget: -0.46ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,dashboard,driver_headrest,acceleration,Negative time budget: -0.46ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,dashboard,driver_ear_left,highway,Negative time budget: -0.35ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,dashboard,driver_ear_left,city,Negative time budget: -0.35ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,dashboard,driver_ear_left,acceleration,Negative time budget: -0.35ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,a_pillar_left,driver_headrest,highway,Negative time budget: -1.43ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,a_pillar_left,driver_headrest,city,Negative time budget: -1.43ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,a_pillar_left,driver_headrest,acceleration,Negative time budget: -1.43ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,a_pillar_left,driver_ear_left,highway,Negative time budget: -1.33ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,a_pillar_left,driver_ear_left,city,Negative time budget: -1.33ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_left,a_pillar_left,driver_ear_left,acceleration,Negative time budget: -1.33ms - anti-noise will arrive late
+True,7.683384118216891,0.716125,0.015601926135277834,1.3162136642946385,2.984442996607575,2.4329817097545146,dash_center,firewall_center,driver_headrest,highway,
+True,16.965904936986163,0.0665,0.012424817026012417,1.3162136642946385,2.984442996607575,2.4329817097545146,dash_center,firewall_center,driver_headrest,city,
+True,24.966250468728155,0.071625,0.0030135372233055613,1.3162136642946385,2.984442996607575,2.4329817097545146,dash_center,firewall_center,driver_headrest,acceleration,
+True,8.192467489039108,0.089625,0.011502972683578708,1.301637260920657,3.0067257939492924,2.460264213453507,dash_center,firewall_center,driver_ear_left,highway,
+True,18.543484703151286,0.0864375,0.005119920642682423,1.301637260920657,3.0067257939492924,2.460264213453507,dash_center,firewall_center,driver_ear_left,city,
+True,30.35841889188637,0.0709375,0.0023840174185489863,1.301637260920657,3.0067257939492924,2.460264213453507,dash_center,firewall_center,driver_ear_left,acceleration,
+False,-999.0,-1.0,-1.0,,,,dash_center,dashboard,driver_headrest,highway,Negative time budget: -0.49ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,dashboard,driver_headrest,city,Negative time budget: -0.49ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,dashboard,driver_headrest,acceleration,Negative time budget: -0.49ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,dashboard,driver_ear_left,highway,Negative time budget: -0.51ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,dashboard,driver_ear_left,city,Negative time budget: -0.51ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,dashboard,driver_ear_left,acceleration,Negative time budget: -0.51ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,a_pillar_left,driver_headrest,highway,Negative time budget: -1.47ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,a_pillar_left,driver_headrest,city,Negative time budget: -1.47ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,a_pillar_left,driver_headrest,acceleration,Negative time budget: -1.47ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,a_pillar_left,driver_ear_left,highway,Negative time budget: -1.48ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,a_pillar_left,driver_ear_left,city,Negative time budget: -1.48ms - anti-noise will arrive late
+False,-999.0,-1.0,-1.0,,,,dash_center,a_pillar_left,driver_ear_left,acceleration,Negative time budget: -1.48ms - anti-noise will arrive late

@@ -180,3 +180,73 @@ DEFAULTS = {
     'duration': 5.0,
     'sample_rate': 16000,
 }
+
+
+# =============================================================================
+# SPEAKER PLACEMENT PRESETS
+# =============================================================================
+# Optimal placements discovered from Step 8 optimization study
+# Using existing car stereo speakers for anti-noise generation
+
+SPEAKER_PLACEMENT_PRESETS = {
+    'Headrest Speaker (Optimal)': {
+        'description': 'Best performance: speaker closest to ear',
+        'speaker': [3.2, 0.55, 1.0],          # Driver headrest
+        'reference_mic': [0.3, 0.92, 0.5],    # Firewall center
+        'error_mic': [3.2, 0.55, 1.0],        # Driver headrest
+        'expected_reduction': '15-20 dB',
+    },
+    'Door Speaker (Common)': {
+        'description': 'Using front door speaker (most cars have this)',
+        'speaker': [2.0, 0.1, 0.4],           # Door left
+        'reference_mic': [0.9, 0.92, 0.8],    # Dashboard
+        'error_mic': [3.2, 0.55, 1.0],        # Driver headrest
+        'expected_reduction': '8-12 dB',
+    },
+    'Dashboard Speaker': {
+        'description': 'Dashboard/A-pillar speaker, good for wind noise',
+        'speaker': [0.8, 0.25, 0.9],          # Dash left
+        'reference_mic': [0.7, 0.15, 1.0],    # A-pillar left
+        'error_mic': [3.2, 0.40, 1.0],        # Driver left ear
+        'expected_reduction': '6-10 dB',
+    },
+    'Rear Speaker': {
+        'description': 'Rear deck speaker (for rear passenger comfort)',
+        'speaker': [4.0, 0.40, 0.9],          # Rear left
+        'reference_mic': [0.3, 0.92, 0.5],    # Firewall center
+        'error_mic': [4.0, 0.92, 1.0],        # Rear center (passenger)
+        'expected_reduction': '5-8 dB',
+    },
+}
+
+# Reference microphone position options
+REF_MIC_OPTIONS = {
+    'Firewall (Engine Noise)': [0.3, 0.92, 0.5],
+    'Dashboard (Central)': [0.9, 0.92, 0.8],
+    'A-Pillar (Wind/Road)': [0.7, 0.15, 1.0],
+    'Under Seat (Road Noise)': [2.5, 0.55, 0.15],
+    'Floor Front (Tire Noise)': [1.0, 0.15, 0.1],
+}
+
+# Error microphone position options
+ERROR_MIC_OPTIONS = {
+    'Driver Headrest': [3.2, 0.55, 1.0],
+    'Driver Left Ear': [3.2, 0.40, 1.0],
+    'Driver Right Ear': [3.2, 0.70, 1.0],
+    'Passenger Headrest': [3.2, 1.30, 1.0],
+    'Sun Visor': [2.8, 0.55, 1.15],
+    'Rearview Mirror': [1.5, 0.92, 1.1],
+}
+
+# Speaker position options (car stereo speakers)
+SPEAKER_OPTIONS = {
+    'Headrest Driver': [3.2, 0.55, 1.0],
+    'Headrest Passenger': [3.2, 1.30, 1.0],
+    'Door Left': [2.0, 0.1, 0.4],
+    'Door Right': [2.0, 1.75, 0.4],
+    'Dashboard Left': [0.8, 0.25, 0.9],
+    'Dashboard Right': [0.8, 1.60, 0.9],
+    'Dashboard Center': [0.8, 0.92, 0.85],
+    'Rear Left': [4.0, 0.40, 0.9],
+    'Rear Right': [4.0, 1.45, 0.9],
+}

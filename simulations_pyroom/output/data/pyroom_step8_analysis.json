@@ -1,0 +1,44 @@
+{
+  "best_overall": {
+    "speaker": "headrest_driver",
+    "ref_mic": "firewall_center",
+    "error_mic": "driver_headrest",
+    "scenario": "acceleration",
+    "noise_reduction_db": 31.25618235423817
+  },
+  "best_per_scenario": {
+    "highway": {
+      "speaker": "headrest_driver",
+      "ref_mic": "firewall_center",
+      "error_mic": "driver_headrest",
+      "noise_reduction_db": 12.242115239425718
+    },
+    "city": {
+      "speaker": "headrest_driver",
+      "ref_mic": "firewall_center",
+      "error_mic": "driver_ear_left",
+      "noise_reduction_db": 24.25010178440092
+    },
+    "acceleration": {
+      "speaker": "headrest_driver",
+      "ref_mic": "firewall_center",
+      "error_mic": "driver_headrest",
+      "noise_reduction_db": 31.25618235423817
+    }
+  },
+  "speaker_ranking": {
+    "dash_center": 17.784985101334662,
+    "dash_left": 16.346009118437582,
+    "headrest_driver": 15.478368985222533,
+    "door_left": 13.15669986151066
+  },
+  "ref_mic_ranking": {
+    "firewall_center": 17.85170574877574,
+    "a_pillar_left": 12.808659596650436,
+    "dashboard": 11.506029285783994
+  },
+  "error_mic_ranking": {
+    "driver_ear_left": 15.563055855153001,
+    "driver_headrest": 14.445994334839957
+  }
+}

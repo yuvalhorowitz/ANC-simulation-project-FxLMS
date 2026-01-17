@@ -42,6 +42,25 @@ COMPONENT_CONFIG = {
     },
 }
 
+COMPONENT_ORDER = ['noise_source', 'reference_mic', 'speaker', 'error_mic']
+
+
+def clamp_position(pos: List[float], dimensions: List[float], margin: float = 0.1) -> List[float]:
+    """Clamp a position to stay within room bounds."""
+    return [
+        max(margin, min(pos[0], dimensions[0] - margin)),
+        max(margin, min(pos[1], dimensions[1] - margin)),
+        max(margin, min(pos[2], dimensions[2] - margin)),
+    ]
+
+
+def clamp_all_positions(positions: Dict[str, List[float]], dimensions: List[float]) -> Dict[str, List[float]]:
+    """Clamp all positions to stay within room bounds."""
+    return {
+        name: clamp_position(pos, dimensions)
+        for name, pos in positions.items()
+    }
+
 
 def create_interactive_room_diagram(
     dimensions: List[float],
@@ -50,14 +69,6 @@ def create_interactive_room_diagram(
 ) -> go.Figure:
     """
     Create an interactive Plotly room diagram.
-
-    Args:
-        dimensions: [length, width, height] of room
-        positions: Dictionary of position names to [x, y, z] coordinates
-        selected_component: Currently selected component for repositioning
-
-    Returns:
-        Plotly figure
     """
     length, width, height = dimensions
 
@@ -88,8 +99,8 @@ def create_interactive_room_diagram(
             layer="below"
         )
 
-    # Draw signal paths (dashed lines)
-    if all(k in positions for k in ['noise_source', 'reference_mic', 'error_mic', 'speaker']):
+    # Draw signal paths
+    if all(k in positions for k in COMPONENT_ORDER):
         # Primary path: noise -> error mic
         fig.add_trace(go.Scatter(
             x=[positions['noise_source'][0], positions['error_mic'][0]],
@@ -213,85 +224,71 @@ def render_interactive_room(params: dict) -> dict:
         Updated positions dictionary
     """
     st.subheader("🏠 Interactive Room Layout")
-    st.caption("Use the sliders below to position each component, then watch the diagram update")
+    st.caption("Use the sliders to position each component - the diagram updates in real-time")
 
     dimensions = params['dimensions']
     length, width, height = dimensions
 
-    # Initialize positions in a separate session state key to avoid conflicts
+    # Initialize positions in session state
     if 'interactive_positions' not in st.session_state:
         st.session_state.interactive_positions = {
             comp: list(params['positions'][comp])
-            for comp in ['noise_source', 'reference_mic', 'speaker', 'error_mic']
+            for comp in COMPONENT_ORDER
         }
+
+    # Clamp positions to current room dimensions (handles dimension changes)
+    st.session_state.interactive_positions = clamp_all_positions(
+        st.session_state.interactive_positions, dimensions
+    )
 
     positions = st.session_state.interactive_positions
 
     # Track which component is being edited
     active_component = None
 
-    # Create tabs for each component
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🔴 Noise Source",
-        "🔵 Reference Mic",
-        "🟢 Speaker",
-        "🟣 Error Mic"
-    ])
+    # Create two columns: sliders on left, diagram on right
+    col_sliders, col_diagram = st.columns([1, 2])
 
-    tabs = [
-        ('noise_source', tab1),
-        ('reference_mic', tab2),
-        ('speaker', tab3),
-        ('error_mic', tab4)
-    ]
-
-    for comp_name, tab in tabs:
-        with tab:
+    with col_sliders:
+        for comp_name in COMPONENT_ORDER:
             config = COMPONENT_CONFIG[comp_name]
             current_pos = positions[comp_name]
 
-            col1, col2 = st.columns([1, 1])
+            st.markdown(f"**{config['emoji']} {config['name']}**")
 
-            with col1:
-                # X position slider
+            # X and Y sliders side by side
+            c1, c2 = st.columns(2)
+            with c1:
                 new_x = st.slider(
-                    "X Position (Length)",
+                    "X",
                     min_value=0.1,
                     max_value=float(length - 0.1),
                     value=float(current_pos[0]),
-                    step=0.05,
-                    key=f"interactive_{comp_name}_x",
-                    help=f"Move {config['name']} along room length"
+                    step=0.1,
+                    key=f"drag_{comp_name}_x",
+                    label_visibility="collapsed"
                 )
-
-                # Y position slider
+            with c2:
                 new_y = st.slider(
-                    "Y Position (Width)",
+                    "Y",
                     min_value=0.1,
                     max_value=float(width - 0.1),
                     value=float(current_pos[1]),
-                    step=0.05,
-                    key=f"interactive_{comp_name}_y",
-                    help=f"Move {config['name']} along room width"
+                    step=0.1,
+                    key=f"drag_{comp_name}_y",
+                    label_visibility="collapsed"
                 )
 
-            with col2:
-                # Z position slider
-                new_z = st.slider(
-                    "Z Position (Height)",
-                    min_value=0.1,
-                    max_value=float(height - 0.1),
-                    value=float(current_pos[2]),
-                    step=0.05,
-                    key=f"interactive_{comp_name}_z",
-                    help=f"Set {config['name']} height"
-                )
-
-                # Show current position
-                st.metric(
-                    "Current Position",
-                    f"({new_x:.2f}, {new_y:.2f}, {new_z:.2f})"
-                )
+            # Z slider (height)
+            new_z = st.slider(
+                f"Height (Z)",
+                min_value=0.1,
+                max_value=float(height - 0.1),
+                value=float(current_pos[2]),
+                step=0.1,
+                key=f"drag_{comp_name}_z",
+                label_visibility="collapsed"
+            )
 
             # Update position if changed
             new_pos = [new_x, new_y, new_z]
@@ -301,21 +298,17 @@ def render_interactive_room(params: dict) -> dict:
                 active_component = comp_name
                 st.session_state.params_changed = True
 
-    # Display the room diagram
-    st.markdown("---")
-    fig = create_interactive_room_diagram(dimensions, positions, active_component)
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            st.markdown("---")
 
-    # Position summary
-    with st.expander("📍 All Positions Summary", expanded=False):
-        cols = st.columns(4)
-        for i, comp_name in enumerate(['noise_source', 'reference_mic', 'speaker', 'error_mic']):
-            config = COMPONENT_CONFIG[comp_name]
-            pos = positions[comp_name]
-            with cols[i]:
-                st.markdown(f"**{config['emoji']} {config['name']}**")
-                st.caption(f"X: {pos[0]:.2f} m")
-                st.caption(f"Y: {pos[1]:.2f} m")
-                st.caption(f"Z: {pos[2]:.2f} m")
+    with col_diagram:
+        # Display the room diagram
+        fig = create_interactive_room_diagram(dimensions, positions, active_component)
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+        # Position summary
+        st.markdown("**Positions:** " + " | ".join([
+            f"{COMPONENT_CONFIG[c]['emoji']} ({positions[c][0]:.1f}, {positions[c][1]:.1f}, {positions[c][2]:.1f})"
+            for c in COMPONENT_ORDER
+        ]))
 
     return positions
