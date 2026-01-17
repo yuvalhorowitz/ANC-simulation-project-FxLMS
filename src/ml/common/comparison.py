@@ -68,7 +68,7 @@ def is_significant_improvement(
     win_rate = np.mean(ml > baseline)
 
     return {
-        'significant': p_value < alpha and improvement > 0,
+        'significant': bool(p_value < alpha and improvement > 0),
         'p_value': float(p_value),
         'mean_improvement': float(improvement),
         'std_improvement': float(np.std(diff)),

@@ -54,7 +54,7 @@ STEP_SIZES = [0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05]
 SCENARIOS = ['idle', 'city', 'highway']
 
 # Number of variations per scenario
-N_VARIATIONS = 10
+N_VARIATIONS = 50  # Increased for better model training
 
 # Simulation parameters
 FS = 16000
