@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from presets import (
     ROOM_PRESETS, SCENARIO_PRESETS, NOISE_PRESETS,
-    FXLMS_PRESETS, DEFAULTS
+    FXLMS_PRESETS, DEFAULTS, FOUR_SPEAKER_CONFIG, SPEAKER_MODES
 )
 
 
@@ -23,6 +23,7 @@ def init_session_state():
         st.session_state.room_preset = DEFAULTS['room_preset']
         st.session_state.scenario_preset = DEFAULTS['scenario_preset']
         st.session_state.fxlms_preset = DEFAULTS['fxlms_preset']
+        st.session_state.speaker_mode = 'Single Speaker'  # Default to single speaker
 
         # Load initial preset values
         preset = ROOM_PRESETS[DEFAULTS['room_preset']]
@@ -160,6 +161,25 @@ def render_sidebar() -> Dict[str, Any]:
     # ==================== Position Configuration ====================
     st.sidebar.header("📍 Positions")
 
+    # ==================== Speaker Mode ====================
+    st.sidebar.subheader("Speaker Setup")
+    speaker_mode = st.sidebar.radio(
+        "Speaker Mode",
+        options=list(SPEAKER_MODES.keys()),
+        index=0 if st.session_state.get('speaker_mode', 'Single Speaker') == 'Single Speaker' else 1,
+        key="speaker_mode_select",
+        on_change=on_param_change,
+        help="Single speaker or 4-speaker system"
+    )
+    st.session_state.speaker_mode = speaker_mode
+    params['speaker_mode'] = speaker_mode
+
+    mode_info = SPEAKER_MODES[speaker_mode]
+    st.sidebar.caption(mode_info['description'])
+
+    if speaker_mode == '4-Speaker System':
+        params['speakers'] = FOUR_SPEAKER_CONFIG.copy()
+
     # Constrain positions to room dimensions
     def pos_slider(label, key_base, default_pos, dim_max):
         col1, col2, col3 = st.sidebar.columns(3)
@@ -184,16 +204,24 @@ def render_sidebar() -> Dict[str, Any]:
         return [x, y, z]
 
     with st.sidebar.expander("Position Details", expanded=False):
-        st.markdown("**🔴 Noise Source**")
+        st.markdown("**Noise Source**")
         noise_pos = pos_slider("Noise", "pos_noise_source", preset['positions']['noise_source'], params['dimensions'])
 
-        st.markdown("**🔵 Reference Mic**")
+        st.markdown("**Reference Mic**")
         ref_pos = pos_slider("Ref", "pos_reference_mic", preset['positions']['reference_mic'], params['dimensions'])
 
-        st.markdown("**🟢 Speaker**")
-        spk_pos = pos_slider("Spk", "pos_speaker", preset['positions']['speaker'], params['dimensions'])
+        # Only show single speaker position if in single speaker mode
+        if speaker_mode == 'Single Speaker':
+            st.markdown("**Speaker**")
+            spk_pos = pos_slider("Spk", "pos_speaker", preset['positions']['speaker'], params['dimensions'])
+        else:
+            # Show 4-speaker positions (fixed, not editable)
+            st.markdown("**4 Speakers (Fixed)**")
+            for name, pos in FOUR_SPEAKER_CONFIG.items():
+                st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
+            spk_pos = [2.0, 0.92, 0.6]  # Placeholder, not used in 4-speaker mode
 
-        st.markdown("**🟣 Error Mic (Ear)**")
+        st.markdown("**Error Mic (Ear)**")
         err_pos = pos_slider("Err", "pos_error_mic", preset['positions']['error_mic'], params['dimensions'])
 
         params['positions'] = {

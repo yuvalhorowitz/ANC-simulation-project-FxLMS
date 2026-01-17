@@ -2,11 +2,13 @@
 Simulation Runner for ANC Playground
 
 Wraps the existing simulation classes to provide a clean interface for the GUI.
+Supports both single-speaker and multi-speaker (4-speaker) ANC modes.
 """
 
 import numpy as np
 import sys
 from pathlib import Path
+from typing import Dict, List
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -20,6 +22,7 @@ from src.noise.noise_mixer import NoiseMixer
 class PlaygroundSimulation:
     """
     Simplified ANC simulation for the Playground GUI.
+    Supports single-speaker mode.
     """
 
     def __init__(self, params: dict):
@@ -198,9 +201,214 @@ class PlaygroundSimulation:
         return self.results
 
 
+class MultiSpeakerSimulation:
+    """
+    Multi-speaker (4-speaker) ANC simulation for the Playground GUI.
+    All speakers receive the same anti-noise signal.
+    """
+
+    def __init__(self, params: dict):
+        """
+        Initialize multi-speaker simulation.
+
+        Args:
+            params: Dictionary containing all simulation parameters
+                   Must include 'speakers' dict with speaker positions
+        """
+        self.params = params
+        self.fs = params.get('sample_rate', 16000)
+        self.speakers = params.get('speakers', {})
+
+        if not self.speakers:
+            raise ValueError("No speakers defined for multi-speaker mode")
+
+        # Build room with multiple speakers
+        self.room = self._create_room()
+
+        # Compute RIRs
+        self.room.compute_rir()
+
+        # Extract paths
+        max_len = 512
+        positions = params['positions']
+
+        # Primary path: noise -> error mic (mic index 1)
+        self.H_primary = self.room.rir[1][0][:max_len]
+
+        # Reference path: noise -> reference mic (mic index 0)
+        self.H_reference = self.room.rir[0][0][:max_len]
+
+        # Secondary paths: each speaker -> error mic
+        self.speaker_names = list(self.speakers.keys())
+        self.H_secondary = {}
+        for i, name in enumerate(self.speaker_names):
+            rir = self.room.rir[1][i + 1][:max_len]  # +1 because source 0 is noise
+            self.H_secondary[name] = rir
+
+        # Combined secondary path (sum of all speaker contributions)
+        self.H_secondary_combined = np.zeros(max_len)
+        for name in self.speaker_names:
+            path = self.H_secondary[name]
+            self.H_secondary_combined[:len(path)] += path
+
+        # Estimate with 5% error
+        self.H_secondary_est = self.H_secondary_combined * (
+            1 + 0.05 * np.random.randn(len(self.H_secondary_combined))
+        )
+
+        # Create FIR filters
+        self.primary_path = FIRPath(self.H_primary)
+        self.reference_path = FIRPath(self.H_reference)
+        self.secondary_paths = {
+            name: FIRPath(self.H_secondary[name]) for name in self.speaker_names
+        }
+
+        # Create FxNLMS with combined secondary path
+        self.fxlms = FxNLMS(
+            filter_length=params['filter_length'],
+            step_size=params['step_size'],
+            secondary_path_estimate=self.H_secondary_est,
+            regularization=1e-4
+        )
+
+        # Noise generator
+        self.noise_gen = NoiseMixer(self.fs)
+
+        self.results = {}
+
+    def _create_room(self) -> pra.ShoeBox:
+        """Create room with multiple speakers."""
+        dims = self.params['dimensions']
+        absorption = self.params['absorption']
+        max_order = self.params['max_order']
+        positions = self.params['positions']
+
+        materials = {
+            'ceiling': pra.Material(absorption * 1.1),
+            'floor': pra.Material(absorption * 1.5),
+            'east': pra.Material(absorption * 0.5),
+            'west': pra.Material(absorption * 0.5),
+            'north': pra.Material(absorption * 0.7),
+            'south': pra.Material(absorption * 0.9),
+        }
+
+        room = pra.ShoeBox(
+            dims,
+            fs=self.fs,
+            materials=materials,
+            max_order=max_order,
+            air_absorption=True
+        )
+
+        # Add noise source (source 0)
+        room.add_source(positions['noise_source'])
+
+        # Add all speakers (sources 1, 2, 3, 4, ...)
+        for name in self.speakers:
+            room.add_source(self.speakers[name])
+
+        # Add microphones: [0] = reference, [1] = error
+        mic_array = np.array([
+            positions['reference_mic'],
+            positions['error_mic']
+        ]).T
+        room.add_microphone_array(pra.MicrophoneArray(mic_array, fs=self.fs))
+
+        return room
+
+    def run(self, progress_callback=None) -> dict:
+        """Run multi-speaker ANC simulation."""
+        duration = self.params['duration']
+        scenario = self.params.get('scenario', 'highway')
+
+        # Generate noise
+        noise_source = self.noise_gen.generate_scenario(duration, scenario)
+        n_samples = len(noise_source)
+
+        # Reset filters
+        self.fxlms.reset()
+        self.primary_path.reset()
+        self.reference_path.reset()
+        for path in self.secondary_paths.values():
+            path.reset()
+
+        # Storage
+        reference = []
+        desired = []
+        antinoise = []
+        error = []
+        mse = []
+
+        for i in range(n_samples):
+            sample = noise_source[i]
+
+            # Reference signal
+            x = self.reference_path.filter_sample(sample)
+            reference.append(x)
+
+            # Noise at error mic
+            d = self.primary_path.filter_sample(sample)
+            desired.append(d)
+
+            # Generate anti-noise (same signal to all speakers)
+            y = self.fxlms.generate_antinoise(x)
+            antinoise.append(y)
+
+            # Anti-noise through ALL secondary paths (sum contributions)
+            y_at_error = 0.0
+            for name in self.speaker_names:
+                y_at_error += self.secondary_paths[name].filter_sample(y)
+
+            # Error
+            e = d + y_at_error
+            error.append(e)
+            mse.append(e ** 2)
+
+            # Update FxLMS
+            self.fxlms.filter_reference(x)
+            self.fxlms.update_weights(e)
+
+            # Progress callback
+            if progress_callback and (i + 1) % (n_samples // 20) == 0:
+                progress = (i + 1) / n_samples
+                current_mse = np.mean(mse[-1000:]) if len(mse) > 1000 else np.mean(mse)
+                progress_callback(progress, current_mse)
+
+        # Calculate noise reduction
+        desired_arr = np.array(desired)
+        error_arr = np.array(error)
+
+        steady_start = len(desired_arr) // 2
+        d_power = np.mean(desired_arr[steady_start:] ** 2)
+        e_power = np.mean(error_arr[steady_start:] ** 2)
+
+        if e_power > 1e-10:
+            noise_reduction_db = 10 * np.log10(d_power / e_power)
+        else:
+            noise_reduction_db = 60.0
+
+        self.results = {
+            'reference': np.array(reference),
+            'desired': desired_arr,
+            'antinoise': np.array(antinoise),
+            'error': error_arr,
+            'mse': np.array(mse),
+            'noise_reduction_db': noise_reduction_db,
+            'weights': self.fxlms.weights.copy(),
+            'duration': duration,
+            'fs': self.fs,
+            'params': self.params,
+            'num_speakers': len(self.speakers),
+            'speaker_names': list(self.speakers.keys()),
+        }
+
+        return self.results
+
+
 def run_simulation(params: dict, progress_callback=None) -> dict:
     """
     Convenience function to run a simulation.
+    Automatically selects single or multi-speaker mode based on params.
 
     Args:
         params: Parameter dictionary from GUI
@@ -210,11 +418,19 @@ def run_simulation(params: dict, progress_callback=None) -> dict:
         Results dictionary
     """
     try:
-        sim = PlaygroundSimulation(params)
+        speaker_mode = params.get('speaker_mode', 'Single Speaker')
+
+        if speaker_mode == '4-Speaker System':
+            sim = MultiSpeakerSimulation(params)
+        else:
+            sim = PlaygroundSimulation(params)
+
         results = sim.run(progress_callback)
         results['success'] = True
         results['error_message'] = None
+        results['speaker_mode'] = speaker_mode
         return results
+
     except Exception as e:
         return {
             'success': False,
@@ -225,6 +441,7 @@ def run_simulation(params: dict, progress_callback=None) -> dict:
             'mse': np.ones(100),
             'weights': np.zeros(params.get('filter_length', 256)),
             'fs': params.get('sample_rate', 16000),
+            'speaker_mode': params.get('speaker_mode', 'Single Speaker'),
         }
 
 
@@ -241,10 +458,19 @@ def validate_positions(params: dict) -> tuple:
     dims = params['dimensions']
     positions = params['positions']
 
+    # Validate main positions
     for name, pos in positions.items():
         for i, (coord, dim) in enumerate(zip(pos, dims)):
             if coord < 0.1 or coord > dim - 0.1:
                 axis = ['x', 'y', 'z'][i]
                 return False, f"{name} {axis}-coordinate ({coord:.2f}) is outside room bounds (0.1 to {dim-0.1:.2f})"
+
+    # Validate speaker positions if in 4-speaker mode
+    if params.get('speaker_mode') == '4-Speaker System' and 'speakers' in params:
+        for name, pos in params['speakers'].items():
+            for i, (coord, dim) in enumerate(zip(pos, dims)):
+                if coord < 0.1 or coord > dim - 0.1:
+                    axis = ['x', 'y', 'z'][i]
+                    return False, f"Speaker {name} {axis}-coordinate ({coord:.2f}) is outside room bounds"
 
     return True, None

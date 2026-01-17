@@ -193,11 +193,19 @@ def main():
         with tab3:
             st.subheader("Room Configuration")
 
+            # Check if in multi-speaker mode
+            is_multi_speaker = params.get('speaker_mode') == '4-Speaker System'
+            speakers_4ch = params.get('speakers') if is_multi_speaker else None
+
             col1, col2 = st.columns([2, 1])
 
             with col1:
-                # Use interactive Plotly diagram
-                fig_room = create_interactive_room_diagram(params['dimensions'], params['positions'])
+                # Use interactive Plotly diagram (pass speakers_4ch for multi-speaker mode)
+                fig_room = create_interactive_room_diagram(
+                    params['dimensions'],
+                    params['positions'],
+                    speakers_4ch=speakers_4ch
+                )
                 st.plotly_chart(fig_room, use_container_width=True)
 
             with col2:
@@ -212,7 +220,16 @@ def main():
 
                 st.markdown("**Positions**")
                 for name, pos in params['positions'].items():
+                    # Skip speaker in multi-speaker mode
+                    if name == 'speaker' and is_multi_speaker:
+                        continue
                     st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
+
+                # Show 4-speaker positions if in multi-speaker mode
+                if is_multi_speaker and speakers_4ch:
+                    st.markdown("**4 Speakers**")
+                    for name, pos in speakers_4ch.items():
+                        st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
 
     else:
         # Initial state - show interactive room diagram
@@ -243,6 +260,7 @@ def main():
                 st.markdown("**Simulation**")
                 st.markdown(f"- Duration: {params['duration']:.1f} s")
                 st.markdown(f"- Sample rate: {params['sample_rate']} Hz")
+                st.markdown(f"- Speaker mode: {params.get('speaker_mode', 'Single Speaker')}")
 
 
 if __name__ == "__main__":

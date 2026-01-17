@@ -495,6 +495,278 @@ class PlacementOptimizer:
         return analysis
 
 
+def plot_car_interior_layout(save_dir: str = 'output/plots'):
+    """
+    Create a top-down car interior visualization showing all mic and speaker positions.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(14, 10))
+
+    # Car dimensions
+    length, width, height = SEDAN_DIMENSIONS
+
+    # Draw car outline
+    car_outline = plt.Rectangle((0, 0), length, width,
+                                  fill=False, edgecolor='#333333', linewidth=3)
+    ax.add_patch(car_outline)
+
+    # Draw windshield (front)
+    windshield = plt.Polygon([[0, 0.1], [0, width-0.1], [0.4, width-0.3], [0.4, 0.3]],
+                              fill=True, facecolor='#87CEEB', edgecolor='#333', alpha=0.5)
+    ax.add_patch(windshield)
+
+    # Draw rear window
+    rear_window = plt.Polygon([[length, 0.15], [length, width-0.15],
+                                [length-0.35, width-0.35], [length-0.35, 0.35]],
+                               fill=True, facecolor='#87CEEB', edgecolor='#333', alpha=0.5)
+    ax.add_patch(rear_window)
+
+    # Draw seats
+    seat_color = '#8B4513'
+    seat_alpha = 0.3
+
+    # Driver seat
+    driver_seat = plt.Rectangle((2.8, 0.25), 0.8, 0.55,
+                                  fill=True, facecolor=seat_color,
+                                  edgecolor='#333', alpha=seat_alpha, linewidth=1)
+    ax.add_patch(driver_seat)
+    ax.text(3.2, 0.52, 'Driver\nSeat', ha='center', va='center', fontsize=8, color='#333')
+
+    # Passenger seat
+    passenger_seat = plt.Rectangle((2.8, 1.05), 0.8, 0.55,
+                                     fill=True, facecolor=seat_color,
+                                     edgecolor='#333', alpha=seat_alpha, linewidth=1)
+    ax.add_patch(passenger_seat)
+    ax.text(3.2, 1.32, 'Passenger\nSeat', ha='center', va='center', fontsize=8, color='#333')
+
+    # Rear seats
+    rear_seat = plt.Rectangle((3.7, 0.2), 0.6, 1.45,
+                                fill=True, facecolor=seat_color,
+                                edgecolor='#333', alpha=seat_alpha, linewidth=1)
+    ax.add_patch(rear_seat)
+    ax.text(4.0, 0.92, 'Rear\nSeats', ha='center', va='center', fontsize=8, color='#333')
+
+    # Dashboard area
+    dashboard = plt.Rectangle((0.4, 0.15), 0.6, width-0.3,
+                                fill=True, facecolor='#696969',
+                                edgecolor='#333', alpha=0.3, linewidth=1)
+    ax.add_patch(dashboard)
+    ax.text(0.7, 0.92, 'Dashboard', ha='center', va='center', fontsize=8, color='#333')
+
+    # Center console
+    console = plt.Rectangle((1.5, 0.75), 1.5, 0.34,
+                              fill=True, facecolor='#A0A0A0',
+                              edgecolor='#333', alpha=0.3, linewidth=1)
+    ax.add_patch(console)
+
+    # =========================================================================
+    # Plot 4 Speakers (Fixed) - Large green circles
+    # =========================================================================
+    for name, pos in SPEAKERS_4CH.items():
+        ax.scatter(pos[0], pos[1], s=300, c='#2ecc71', marker='o',
+                   edgecolors='white', linewidths=2, zorder=10)
+        # Add speaker icon text
+        ax.annotate(f'🔊\n{name.replace("_", " ").title()}',
+                    (pos[0], pos[1]),
+                    textcoords="offset points",
+                    xytext=(0, -30),
+                    ha='center', fontsize=7, color='#27ae60', fontweight='bold')
+
+    # =========================================================================
+    # Plot Reference Mic Positions - Blue triangles
+    # =========================================================================
+    ref_colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(REF_MIC_POSITIONS)))
+    for i, (name, pos) in enumerate(REF_MIC_POSITIONS.items()):
+        ax.scatter(pos[0], pos[1], s=200, c=[ref_colors[i]], marker='^',
+                   edgecolors='white', linewidths=1.5, zorder=15)
+        # Offset labels to avoid overlap
+        offset_y = 15 if i % 2 == 0 else -25
+        ax.annotate(name.replace('_', '\n'),
+                    (pos[0], pos[1]),
+                    textcoords="offset points",
+                    xytext=(0, offset_y),
+                    ha='center', fontsize=6, color='#2980b9')
+
+    # =========================================================================
+    # Plot Error Mic Positions - Purple diamonds
+    # =========================================================================
+    err_colors = plt.cm.Purples(np.linspace(0.4, 0.9, len(ERROR_MIC_POSITIONS)))
+    for i, (name, pos) in enumerate(ERROR_MIC_POSITIONS.items()):
+        ax.scatter(pos[0], pos[1], s=200, c=[err_colors[i]], marker='D',
+                   edgecolors='white', linewidths=1.5, zorder=15)
+        # Offset labels
+        offset_y = 20 if i % 2 == 0 else -25
+        offset_x = 10 if 'right' in name else -10 if 'left' in name else 0
+        ax.annotate(name.replace('_', '\n'),
+                    (pos[0], pos[1]),
+                    textcoords="offset points",
+                    xytext=(offset_x, offset_y),
+                    ha='center', fontsize=6, color='#8e44ad')
+
+    # =========================================================================
+    # Plot Noise Source Positions - Red squares
+    # =========================================================================
+    for name, config in NOISE_CONFIGS.items():
+        pos = config['source_position']
+        ax.scatter(pos[0], pos[1], s=250, c='#e74c3c', marker='s',
+                   edgecolors='white', linewidths=1.5, zorder=12, alpha=0.7)
+        ax.annotate(f'Noise:\n{name}',
+                    (pos[0], pos[1]),
+                    textcoords="offset points",
+                    xytext=(20, 0),
+                    ha='left', fontsize=6, color='#c0392b',
+                    arrowprops=dict(arrowstyle='->', color='#c0392b', lw=0.5))
+
+    # =========================================================================
+    # Add labels and dimensions
+    # =========================================================================
+    ax.set_xlim(-0.5, length + 0.5)
+    ax.set_ylim(-0.5, width + 0.5)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Length (m) - Front ← → Rear', fontsize=11)
+    ax.set_ylabel('Width (m) - Driver ↓ ↑ Passenger', fontsize=11)
+    ax.set_title(f'Car Interior Layout - Microphone & Speaker Positions\n'
+                 f'Sedan: {length}m × {width}m × {height}m', fontsize=14, fontweight='bold')
+
+    # Add grid
+    ax.grid(True, alpha=0.3, linestyle='--')
+    ax.set_axisbelow(True)
+
+    # Add arrow showing car direction
+    ax.annotate('', xy=(0.2, -0.3), xytext=(0.8, -0.3),
+                arrowprops=dict(arrowstyle='->', color='gray', lw=2))
+    ax.text(0.5, -0.4, 'FRONT', ha='center', fontsize=9, color='gray')
+
+    # =========================================================================
+    # Add legend
+    # =========================================================================
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#2ecc71',
+               markersize=15, label=f'Speakers (4 fixed)', markeredgecolor='white'),
+        Line2D([0], [0], marker='^', color='w', markerfacecolor='#3498db',
+               markersize=12, label=f'Reference Mics ({len(REF_MIC_POSITIONS)} tested)', markeredgecolor='white'),
+        Line2D([0], [0], marker='D', color='w', markerfacecolor='#9b59b6',
+               markersize=10, label=f'Error Mics ({len(ERROR_MIC_POSITIONS)} tested)', markeredgecolor='white'),
+        Line2D([0], [0], marker='s', color='w', markerfacecolor='#e74c3c',
+               markersize=10, label=f'Noise Sources ({len(NOISE_CONFIGS)} types)', markeredgecolor='white', alpha=0.7),
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=9)
+
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/pyroom_step8_car_layout.png', dpi=150, bbox_inches='tight')
+    print(f"Saved: {save_dir}/pyroom_step8_car_layout.png")
+    plt.close()
+
+
+def plot_car_interior_results(df: pd.DataFrame, analysis: dict, save_dir: str = 'output/plots'):
+    """
+    Create car interior visualization highlighting the best mic positions.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 8))
+
+    # Car dimensions
+    length, width, height = SEDAN_DIMENSIONS
+
+    for ax_idx, ax in enumerate(axes):
+        # Draw car outline
+        car_outline = plt.Rectangle((0, 0), length, width,
+                                      fill=False, edgecolor='#333333', linewidth=3)
+        ax.add_patch(car_outline)
+
+        # Windshield
+        windshield = plt.Polygon([[0, 0.1], [0, width-0.1], [0.4, width-0.3], [0.4, 0.3]],
+                                  fill=True, facecolor='#87CEEB', edgecolor='#333', alpha=0.3)
+        ax.add_patch(windshield)
+
+        # Seats (simplified)
+        driver_seat = plt.Rectangle((2.8, 0.25), 0.8, 0.55,
+                                      fill=True, facecolor='#8B4513', alpha=0.2)
+        ax.add_patch(driver_seat)
+        passenger_seat = plt.Rectangle((2.8, 1.05), 0.8, 0.55,
+                                         fill=True, facecolor='#8B4513', alpha=0.2)
+        ax.add_patch(passenger_seat)
+
+        # Plot speakers
+        for name, pos in SPEAKERS_4CH.items():
+            ax.scatter(pos[0], pos[1], s=200, c='#2ecc71', marker='o',
+                       edgecolors='white', linewidths=2, zorder=10, alpha=0.7)
+
+        ax.set_xlim(-0.3, length + 0.3)
+        ax.set_ylim(-0.3, width + 0.3)
+        ax.set_aspect('equal')
+        ax.grid(True, alpha=0.3, linestyle='--')
+
+    # Left plot: Reference Mic Performance
+    ax = axes[0]
+    ax.set_title('Reference Microphone Performance\n(Color = Avg Noise Reduction)', fontsize=12, fontweight='bold')
+
+    df_valid = df[df['success'] == True]
+    ref_avg = df_valid.groupby('ref_mic')['noise_reduction_db'].mean()
+
+    # Normalize colors
+    vmin, vmax = ref_avg.min(), ref_avg.max()
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    cmap = plt.cm.RdYlGn
+
+    for name, pos in REF_MIC_POSITIONS.items():
+        if name in ref_avg:
+            color = cmap(norm(ref_avg[name]))
+            size = 300 + (ref_avg[name] - vmin) / (vmax - vmin) * 300
+            ax.scatter(pos[0], pos[1], s=size, c=[color], marker='^',
+                       edgecolors='black', linewidths=2, zorder=15)
+            ax.annotate(f'{name.replace("_", " ")}\n{ref_avg[name]:.1f} dB',
+                        (pos[0], pos[1]),
+                        textcoords="offset points",
+                        xytext=(0, 25),
+                        ha='center', fontsize=7, fontweight='bold')
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, shrink=0.6)
+    cbar.set_label('Noise Reduction (dB)')
+    ax.set_xlabel('Length (m)')
+    ax.set_ylabel('Width (m)')
+
+    # Right plot: Error Mic Performance
+    ax = axes[1]
+    ax.set_title('Error Microphone Performance\n(Color = Avg Noise Reduction)', fontsize=12, fontweight='bold')
+
+    err_avg = df_valid.groupby('error_mic')['noise_reduction_db'].mean()
+
+    vmin, vmax = err_avg.min(), err_avg.max()
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+
+    for name, pos in ERROR_MIC_POSITIONS.items():
+        if name in err_avg:
+            color = cmap(norm(err_avg[name]))
+            size = 300 + (err_avg[name] - vmin) / (vmax - vmin) * 300
+            ax.scatter(pos[0], pos[1], s=size, c=[color], marker='D',
+                       edgecolors='black', linewidths=2, zorder=15)
+            ax.annotate(f'{name.replace("_", " ")}\n{err_avg[name]:.1f} dB',
+                        (pos[0], pos[1]),
+                        textcoords="offset points",
+                        xytext=(0, 25),
+                        ha='center', fontsize=7, fontweight='bold')
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, shrink=0.6)
+    cbar.set_label('Noise Reduction (dB)')
+    ax.set_xlabel('Length (m)')
+    ax.set_ylabel('Width (m)')
+
+    plt.suptitle('Microphone Position Performance in Car Interior (4-Speaker ANC)',
+                 fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/pyroom_step8_car_results.png', dpi=150, bbox_inches='tight')
+    print(f"Saved: {save_dir}/pyroom_step8_car_results.png")
+    plt.close()
+
+
 def plot_heatmap_per_noise(df: pd.DataFrame, save_dir: str = 'output/plots'):
     """Create heatmaps for each noise type."""
     os.makedirs(save_dir, exist_ok=True)
@@ -708,6 +980,13 @@ def main():
     print("GENERATING VISUALIZATIONS")
     print("=" * 70)
 
+    # Car interior layout (shows all positions being tested)
+    plot_car_interior_layout()
+
+    # Performance results on car layout
+    plot_car_interior_results(df, analysis)
+
+    # Heatmaps and other plots
     plot_heatmap_per_noise(df)
     plot_mic_rankings(df)
     plot_noise_comparison(df)
@@ -725,6 +1004,8 @@ def main():
     for name, pos in SPEAKERS_4CH.items():
         print(f"  - {name}: {pos}")
     print("\nOutput files:")
+    print("  output/plots/pyroom_step8_car_layout.png      <- CAR INTERIOR WITH ALL POSITIONS")
+    print("  output/plots/pyroom_step8_car_results.png     <- PERFORMANCE ON CAR LAYOUT")
     print("  output/data/pyroom_step8_sweep_results.csv")
     print("  output/data/pyroom_step8_analysis.json")
     print("  output/plots/pyroom_step8_heatmap_*.png")

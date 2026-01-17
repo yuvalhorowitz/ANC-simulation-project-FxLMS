@@ -9,6 +9,11 @@ import streamlit as st
 import plotly.graph_objects as go
 from typing import Dict, List, Optional
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from presets import FOUR_SPEAKER_CONFIG
+
 
 # Component styling configuration
 COMPONENT_CONFIG = {
@@ -42,6 +47,14 @@ COMPONENT_CONFIG = {
     },
 }
 
+# 4-speaker styling
+SPEAKER_4CH_CONFIG = {
+    'front_left': {'color': '#27ae60', 'name': 'Front Left (Door)'},
+    'front_right': {'color': '#2ecc71', 'name': 'Front Right (Door)'},
+    'dash_left': {'color': '#1abc9c', 'name': 'Dash Left'},
+    'dash_right': {'color': '#16a085', 'name': 'Dash Right'},
+}
+
 COMPONENT_ORDER = ['noise_source', 'reference_mic', 'speaker', 'error_mic']
 
 
@@ -65,12 +78,20 @@ def clamp_all_positions(positions: Dict[str, List[float]], dimensions: List[floa
 def create_interactive_room_diagram(
     dimensions: List[float],
     positions: Dict[str, List[float]],
-    selected_component: Optional[str] = None
+    selected_component: Optional[str] = None,
+    speakers_4ch: Optional[Dict[str, List[float]]] = None
 ) -> go.Figure:
     """
     Create an interactive Plotly room diagram.
+
+    Args:
+        dimensions: Room [length, width, height]
+        positions: Component positions
+        selected_component: Currently selected component
+        speakers_4ch: Optional dict of 4-speaker positions (for multi-speaker mode)
     """
     length, width, height = dimensions
+    is_multi_speaker = speakers_4ch is not None
 
     fig = go.Figure()
 
@@ -100,7 +121,7 @@ def create_interactive_room_diagram(
         )
 
     # Draw signal paths
-    if all(k in positions for k in COMPONENT_ORDER):
+    if all(k in positions for k in ['noise_source', 'reference_mic', 'error_mic']):
         # Primary path: noise -> error mic
         fig.add_trace(go.Scatter(
             x=[positions['noise_source'][0], positions['error_mic'][0]],
@@ -109,17 +130,6 @@ def create_interactive_room_diagram(
             line=dict(color='#e74c3c', width=2, dash='dash'),
             opacity=0.5,
             name='Primary Path',
-            hoverinfo='name'
-        ))
-
-        # Secondary path: speaker -> error mic
-        fig.add_trace(go.Scatter(
-            x=[positions['speaker'][0], positions['error_mic'][0]],
-            y=[positions['speaker'][1], positions['error_mic'][1]],
-            mode='lines',
-            line=dict(color='#2ecc71', width=2, dash='dash'),
-            opacity=0.5,
-            name='Secondary Path',
             hoverinfo='name'
         ))
 
@@ -134,9 +144,66 @@ def create_interactive_room_diagram(
             hoverinfo='name'
         ))
 
-    # Plot each component
+        # Secondary paths
+        if is_multi_speaker:
+            # Draw paths from all 4 speakers to error mic
+            for spk_name, spk_pos in speakers_4ch.items():
+                fig.add_trace(go.Scatter(
+                    x=[spk_pos[0], positions['error_mic'][0]],
+                    y=[spk_pos[1], positions['error_mic'][1]],
+                    mode='lines',
+                    line=dict(color='#2ecc71', width=1, dash='dot'),
+                    opacity=0.3,
+                    name=f'Secondary ({spk_name})',
+                    hoverinfo='name',
+                    showlegend=False
+                ))
+        elif 'speaker' in positions:
+            # Single speaker secondary path
+            fig.add_trace(go.Scatter(
+                x=[positions['speaker'][0], positions['error_mic'][0]],
+                y=[positions['speaker'][1], positions['error_mic'][1]],
+                mode='lines',
+                line=dict(color='#2ecc71', width=2, dash='dash'),
+                opacity=0.5,
+                name='Secondary Path',
+                hoverinfo='name'
+            ))
+
+    # Plot 4 speakers if in multi-speaker mode
+    if is_multi_speaker:
+        for spk_name, spk_pos in speakers_4ch.items():
+            spk_config = SPEAKER_4CH_CONFIG.get(spk_name, {'color': '#2ecc71', 'name': spk_name})
+            fig.add_trace(go.Scatter(
+                x=[spk_pos[0]],
+                y=[spk_pos[1]],
+                mode='markers+text',
+                marker=dict(
+                    color=spk_config['color'],
+                    size=16,
+                    symbol='circle',
+                    line=dict(color='white', width=2)
+                ),
+                text=[spk_name.replace('_', ' ').title()],
+                textposition="top center",
+                textfont=dict(size=9, color='#495057'),
+                name=spk_config['name'],
+                hovertemplate=(
+                    f"<b>{spk_config['name']}</b><br>"
+                    f"X: {spk_pos[0]:.2f} m<br>"
+                    f"Y: {spk_pos[1]:.2f} m<br>"
+                    f"Z: {spk_pos[2]:.2f} m<br>"
+                    "<extra></extra>"
+                )
+            ))
+
+    # Plot each component (skip speaker if in multi-speaker mode)
     for comp_name, pos in positions.items():
         if comp_name in COMPONENT_CONFIG:
+            # Skip single speaker in multi-speaker mode
+            if comp_name == 'speaker' and is_multi_speaker:
+                continue
+
             config = COMPONENT_CONFIG[comp_name]
             is_selected = comp_name == selected_component
 
@@ -167,9 +234,10 @@ def create_interactive_room_diagram(
             ))
 
     # Layout configuration
+    title_suffix = " (4-Speaker Mode)" if is_multi_speaker else ""
     fig.update_layout(
         title=dict(
-            text=f"Room Layout (Top View) - {length:.1f}m × {width:.1f}m × {height:.1f}m",
+            text=f"Room Layout (Top View) - {length:.1f}m × {width:.1f}m × {height:.1f}m{title_suffix}",
             font=dict(size=16)
         ),
         xaxis=dict(
@@ -223,7 +291,12 @@ def render_interactive_room(params: dict) -> dict:
     Returns:
         Updated positions dictionary
     """
-    st.subheader("🏠 Interactive Room Layout")
+    # Check if we're in multi-speaker mode
+    is_multi_speaker = params.get('speaker_mode') == '4-Speaker System'
+    speakers_4ch = params.get('speakers') if is_multi_speaker else None
+
+    title_suffix = " (4-Speaker Mode)" if is_multi_speaker else ""
+    st.subheader(f"🏠 Interactive Room Layout{title_suffix}")
     st.caption("Use the sliders to position each component - the diagram updates in real-time")
 
     dimensions = params['dimensions']
@@ -251,6 +324,10 @@ def render_interactive_room(params: dict) -> dict:
 
     with col_sliders:
         for comp_name in COMPONENT_ORDER:
+            # Skip single speaker control in multi-speaker mode
+            if comp_name == 'speaker' and is_multi_speaker:
+                continue
+
             config = COMPONENT_CONFIG[comp_name]
             current_pos = positions[comp_name]
 
@@ -301,14 +378,22 @@ def render_interactive_room(params: dict) -> dict:
             st.markdown("---")
 
     with col_diagram:
-        # Display the room diagram
-        fig = create_interactive_room_diagram(dimensions, positions, active_component)
+        # Display the room diagram (pass speakers_4ch for multi-speaker mode)
+        fig = create_interactive_room_diagram(dimensions, positions, active_component, speakers_4ch)
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-        # Position summary
+        # Position summary (skip speaker in multi-speaker mode)
+        components_to_show = [c for c in COMPONENT_ORDER if not (c == 'speaker' and is_multi_speaker)]
         st.markdown("**Positions:** " + " | ".join([
             f"{COMPONENT_CONFIG[c]['emoji']} ({positions[c][0]:.1f}, {positions[c][1]:.1f}, {positions[c][2]:.1f})"
-            for c in COMPONENT_ORDER
+            for c in components_to_show
         ]))
+
+        # Show 4-speaker positions if in multi-speaker mode
+        if is_multi_speaker and speakers_4ch:
+            st.markdown("**4-Speaker Positions:** " + " | ".join([
+                f"{name.replace('_', ' ').title()} ({pos[0]:.1f}, {pos[1]:.1f})"
+                for name, pos in speakers_4ch.items()
+            ]))
 
     return positions

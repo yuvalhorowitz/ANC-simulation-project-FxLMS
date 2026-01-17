@@ -250,3 +250,27 @@ SPEAKER_OPTIONS = {
     'Rear Left': [4.0, 0.40, 0.9],
     'Rear Right': [4.0, 1.45, 0.9],
 }
+
+# =============================================================================
+# 4-SPEAKER FIXED CONFIGURATION
+# =============================================================================
+# Used when multi-speaker mode is enabled
+
+FOUR_SPEAKER_CONFIG = {
+    'front_left': [2.0, 0.1, 0.4],       # Driver door
+    'front_right': [2.0, 1.75, 0.4],     # Passenger door
+    'dash_left': [0.8, 0.25, 0.9],       # Dashboard driver side
+    'dash_right': [0.8, 1.60, 0.9],      # Dashboard passenger side
+}
+
+# Speaker mode options
+SPEAKER_MODES = {
+    'Single Speaker': {
+        'description': 'One speaker for anti-noise (position adjustable)',
+        'num_speakers': 1,
+    },
+    '4-Speaker System': {
+        'description': '4 speakers working together (front doors + dashboard)',
+        'num_speakers': 4,
+    },
+}
