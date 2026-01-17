@@ -1,0 +1,5 @@
+# This file is used internally by FFMPEG.
+file 'file:C:/Users/97250/Documents/שנה ד/סמסטר א/פרוייקט גמר/ANC-simulation-project-FxLMS/media/videos/presentation_scene/480p15/partial_movie_files/DataDrivenANC/1185818338_1258944921_3871581877.mp4'
+file 'file:C:/Users/97250/Documents/שנה ד/סמסטר א/פרוייקט גמר/ANC-simulation-project-FxLMS/media/videos/presentation_scene/480p15/partial_movie_files/DataDrivenANC/624642324_1333071718_4192612246.mp4'
+file 'file:C:/Users/97250/Documents/שנה ד/סמסטר א/פרוייקט גמר/ANC-simulation-project-FxLMS/media/videos/presentation_scene/480p15/partial_movie_files/DataDrivenANC/624642324_1825131914_3390198106.mp4'
+file 'file:C:/Users/97250/Documents/שנה ד/סמסטר א/פרוייקט גמר/ANC-simulation-project-FxLMS/media/videos/presentation_scene/480p15/partial_movie_files/DataDrivenANC/624642324_4247107814_2272458374.mp4'
