@@ -19,7 +19,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from components.sidebar import render_sidebar, render_run_button
 from components.plots import (
     plot_before_after, plot_spectrum,
-    plot_convergence, plot_filter_coefficients
+    plot_convergence, plot_convergence_db, plot_filter_coefficients,
+    plot_ref_mic_signals_time, plot_ref_mic_signals_freq,
+    plot_error_mic_time, plot_error_mic_freq,
+    plot_noise_source_time, plot_noise_source_freq
 )
 from components.audio_player import render_audio_player
 from components.room_diagram import plot_room_diagram
@@ -125,7 +128,7 @@ def main():
                 st.rerun()
 
         # Metrics row
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
             st.metric(
@@ -135,19 +138,35 @@ def main():
             )
 
         with col2:
-            final_mse = results['mse'][-1] if len(results['mse']) > 0 else 0
-            st.metric("Final MSE", f"{final_mse:.2e}")
+            conv_time = results.get('convergence_time', 0)
+            st.metric(
+                "Convergence (90%)",
+                f"{conv_time:.2f} s",
+                delta="Fast" if conv_time < 1.0 else None
+            )
 
         with col3:
-            st.metric("Filter Taps", f"{len(results['weights'])}")
+            # Use averaged MSE (last 200 samples) to match graph smoothing
+            mse_array = results['mse']
+            window = min(200, len(mse_array))
+            final_mse = np.mean(mse_array[-window:]) if len(mse_array) > 0 else 0
+            st.metric("Final MSE", f"{final_mse:.2e}")
 
         with col4:
+            st.metric("Filter Taps", f"{len(results['weights'])}")
+
+        with col5:
             st.metric("Duration", f"{results['duration']:.1f} s")
+
+        # Display scenario order for Dynamic Ride
+        if results.get('scenario_order'):
+            order_str = " → ".join([s.title() for s in results['scenario_order']])
+            st.info(f"**Scenario Sequence:** {order_str}")
 
         st.divider()
 
         # Tabs for different views
-        tab1, tab2, tab3 = st.tabs(["📊 Visualizations", "🔊 Audio", "🏠 Room Layout"])
+        tab1, tab2, tab3, tab4 = st.tabs(["📊 Visualizations", "🎤 Mic Signals", "🔊 Audio", "🏠 Room Layout"])
 
         with tab1:
             # Visualization plots in 2x2 grid
@@ -158,7 +177,7 @@ def main():
                 fig1 = plot_before_after(results)
                 st.pyplot(fig1)
 
-                st.subheader("Convergence")
+                st.subheader("MSE Convergence")
                 fig3 = plot_convergence(results)
                 st.pyplot(fig3)
 
@@ -167,11 +186,70 @@ def main():
                 fig2 = plot_spectrum(results)
                 st.pyplot(fig2)
 
-                st.subheader("Filter Coefficients")
-                fig4 = plot_filter_coefficients(results)
-                st.pyplot(fig4)
+                st.subheader("Noise Reduction Over Time")
+                fig_conv_db = plot_convergence_db(results)
+                st.pyplot(fig_conv_db)
+
+            # Filter coefficients in full width
+            st.subheader("Filter Coefficients")
+            fig4 = plot_filter_coefficients(results)
+            st.pyplot(fig4)
 
         with tab2:
+            st.subheader("Microphone Signal Analysis")
+
+            # Noise source signal (always shown)
+            st.markdown("### Noise Source (Raw Signal)")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("**Time Domain**")
+                fig_noise_time = plot_noise_source_time(results)
+                st.pyplot(fig_noise_time)
+
+            with col2:
+                st.markdown("**Frequency Domain**")
+                fig_noise_freq = plot_noise_source_freq(results)
+                st.pyplot(fig_noise_freq)
+
+            st.divider()
+
+            # Error mic signals (always shown)
+            st.markdown("### Error Mic (Driver's Ear)")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("**Time Domain**")
+                fig_err_time = plot_error_mic_time(results)
+                st.pyplot(fig_err_time)
+
+            with col2:
+                st.markdown("**Frequency Domain**")
+                fig_err_freq = plot_error_mic_freq(results)
+                st.pyplot(fig_err_freq)
+
+            # Reference mic signals (only shown in multi-ref-mic mode)
+            if 'ref_mic_signals' in results and len(results.get('ref_mic_names', [])) > 1:
+                st.divider()
+                st.markdown("### Reference Mics (4-Ref Mode)")
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("**Time Domain**")
+                    fig_ref_time = plot_ref_mic_signals_time(results)
+                    st.pyplot(fig_ref_time)
+
+                with col2:
+                    st.markdown("**Frequency Domain**")
+                    fig_ref_freq = plot_ref_mic_signals_freq(results)
+                    st.pyplot(fig_ref_freq)
+
+                # Info about ref mics
+                st.info(f"Showing {len(results['ref_mic_names'])} reference mics: {', '.join([n.replace('_', ' ').title() for n in results['ref_mic_names']])}")
+            else:
+                st.info("Switch to **4-Reference Mic System** in the sidebar to see individual reference mic signals.")
+
+        with tab3:
             render_audio_player(results)
 
             st.divider()
@@ -190,21 +268,26 @@ def main():
                 st.markdown(f"- RMS Level: {np.sqrt(np.mean(results['error']**2)):.4f}")
                 st.markdown(f"- Peak Level: {np.max(np.abs(results['error'])):.4f}")
 
-        with tab3:
+        with tab4:
             st.subheader("Room Configuration")
 
             # Check if in multi-speaker mode
             is_multi_speaker = params.get('speaker_mode') == '4-Speaker System'
             speakers_4ch = params.get('speakers') if is_multi_speaker else None
 
+            # Check if in multi-ref-mic mode
+            is_multi_ref_mic = params.get('ref_mic_mode') == '4-Reference Mic System'
+            ref_mics_4ch = params.get('ref_mics') if is_multi_ref_mic else None
+
             col1, col2 = st.columns([2, 1])
 
             with col1:
-                # Use interactive Plotly diagram (pass speakers_4ch for multi-speaker mode)
+                # Use interactive Plotly diagram (pass speakers_4ch and ref_mics_4ch)
                 fig_room = create_interactive_room_diagram(
                     params['dimensions'],
                     params['positions'],
-                    speakers_4ch=speakers_4ch
+                    speakers_4ch=speakers_4ch,
+                    ref_mics_4ch=ref_mics_4ch
                 )
                 st.plotly_chart(fig_room, use_container_width=True)
 
@@ -223,12 +306,21 @@ def main():
                     # Skip speaker in multi-speaker mode
                     if name == 'speaker' and is_multi_speaker:
                         continue
+                    # Skip reference_mic in multi-ref-mic mode
+                    if name == 'reference_mic' and is_multi_ref_mic:
+                        continue
                     st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
 
                 # Show 4-speaker positions if in multi-speaker mode
                 if is_multi_speaker and speakers_4ch:
                     st.markdown("**4 Speakers**")
                     for name, pos in speakers_4ch.items():
+                        st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
+
+                # Show 4-ref-mic positions if in multi-ref-mic mode
+                if is_multi_ref_mic and ref_mics_4ch:
+                    st.markdown("**4 Reference Mics**")
+                    for name, pos in ref_mics_4ch.items():
                         st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
 
     else:

@@ -1,30 +1,53 @@
 {
-  "timestamp": "2026-01-17T19:21:54.053899",
+  "timestamp": "2026-01-18T11:54:45.876996",
   "baseline_step_size": 0.005,
   "comparison": {
     "significant": false,
-    "p_value": 0.21908935220470838,
-    "mean_improvement": -0.5748337933507486,
-    "std_improvement": 1.6716662190569824,
-    "cohens_d": -0.34386876205504563,
-    "win_rate": 0.4,
-    "n_samples": 15
+    "p_value": 0.1266054620915495,
+    "mean_improvement": 0.05910125008534539,
+    "std_improvement": 0.20235457113783437,
+    "cohens_d": 0.29206777847326665,
+    "win_rate": 0.6666666666666666,
+    "n_samples": 30
   },
   "per_scenario": {
     "idle": {
-      "baseline_mean_nr": 4.840468290254439,
-      "adaptive_mean_nr": 6.069914030747503,
-      "adaptive_mean_mu": 0.009923390578478575
+      "baseline_mean_nr": 4.89396840957019,
+      "adaptive_mean_nr": 4.975184358159552,
+      "adaptive_mean_mu": 0.004999999999999999
     },
     "city": {
-      "baseline_mean_nr": 14.895427770280426,
-      "adaptive_mean_nr": 12.640603427173284,
-      "adaptive_mean_mu": 0.001488591742236167
+      "baseline_mean_nr": 13.5734267278211,
+      "adaptive_mean_nr": 13.651611224296863,
+      "adaptive_mean_mu": 0.004999999999999999
     },
     "highway": {
-      "baseline_mean_nr": 5.608724764457838,
-      "adaptive_mean_nr": 4.909601987019665,
-      "adaptive_mean_mu": 0.002822599932551384
+      "baseline_mean_nr": 4.363205707762349,
+      "adaptive_mean_nr": 4.381109012953262,
+      "adaptive_mean_mu": 0.004999999999999999
     }
-  }
+  },
+  "phase1_criteria": {
+    "mean_improvement_db": {
+      "value": 0.05910125008534539,
+      "target": 1.0,
+      "passed": false
+    },
+    "worst_case_drop_db": {
+      "value": 0.017903305190912988,
+      "target": -0.5,
+      "passed": true
+    },
+    "stability_rate": {
+      "value": 0.7333333333333333,
+      "target": 0.99,
+      "passed": false
+    },
+    "convergence_speedup": {
+      "value": 0.0,
+      "target": 1.1,
+      "passed": false
+    }
+  },
+  "phase1_passed": false
 }

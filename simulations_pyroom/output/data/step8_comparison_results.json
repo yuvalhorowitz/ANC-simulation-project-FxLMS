@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-01-21T15:48:29.543780",
+  "question": "Is 4-speaker better than a well-placed single speaker?",
+  "answer": "No",
+  "average_difference_db": 1.951760824574925,
+  "results": {
+    "engine": {
+      "single_headrest": {
+        "nr_db": 5.098845202088945
+      },
+      "quad_stereo": {
+        "nr_db": 3.295455411890795
+      }
+    },
+    "road": {
+      "single_headrest": {
+        "nr_db": 14.672324950281872
+      },
+      "quad_stereo": {
+        "nr_db": 13.083515911219246
+      }
+    },
+    "highway": {
+      "single_headrest": {
+        "nr_db": 2.9528114427511203
+      },
+      "quad_stereo": {
+        "nr_db": 0.4897277982871232
+      }
+    }
+  }
+}

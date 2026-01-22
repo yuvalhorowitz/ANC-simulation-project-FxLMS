@@ -167,6 +167,13 @@ y = classified_anc.generate_antinoise(x)
 
 FxLMS is limited to linear filtering. Complex acoustic environments may benefit from nonlinear processing.
 
+### Work Plan Alignment (Project 3214)
+
+This phase addresses the work plan's goal of using deep learning for anti-noise generation:
+- **Target**: Replace/enhance classical filters with neural networks
+- **Quantitative Requirements**: Memory ≤ 150MB, MSE ≤ 0.001
+- **Noise Reduction Targets**: Engine ≥15dB, Road ≥10dB, Cabin ≥10dB
+
 ### The Solution
 
 Replace the FIR filter entirely with a neural network trained to generate anti-noise:

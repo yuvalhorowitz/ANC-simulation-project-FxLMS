@@ -1,0 +1,9 @@
+Phase 2: max_order Optimization Results
+Generated: 2026-01-21T13:54:51.326771
+============================================================
+
+Compact Car: 6.3 -> 5.2 dB (-1.0 dB), order 3->8
+Sedan: 12.5 -> 1.0 dB (-11.5 dB), order 3->7
+SUV: 21.3 -> 21.0 dB (-0.3 dB), order 4->7
+
+Average improvement: -4.3 dB

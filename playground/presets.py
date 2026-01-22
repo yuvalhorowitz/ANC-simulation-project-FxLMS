@@ -13,8 +13,8 @@ ROOM_PRESETS = {
         'positions': {
             'noise_source': [0.4, 0.8, 0.35],
             'reference_mic': [0.9, 0.8, 0.7],
-            'speaker': [3.0, 0.8, 0.5],
-            'error_mic': [3.4, 0.6, 0.9],
+            'speaker': [0.7, 0.25, 0.8],  # Dashboard driver side (steering wheel area)
+            'error_mic': [2.0, 0.45, 0.95],  # Driver headrest
         },
     },
     'Sedan': {
@@ -24,8 +24,8 @@ ROOM_PRESETS = {
         'positions': {
             'noise_source': [0.5, 0.92, 0.4],
             'reference_mic': [1.1, 0.92, 0.8],
-            'speaker': [3.6, 0.92, 0.6],
-            'error_mic': [4.0, 0.75, 1.0],
+            'speaker': [0.8, 0.25, 0.9],  # Dashboard driver side (steering wheel area)
+            'error_mic': [2.5, 0.55, 1.05],  # Driver headrest
         },
     },
     'SUV': {
@@ -35,41 +35,8 @@ ROOM_PRESETS = {
         'positions': {
             'noise_source': [0.6, 1.05, 0.5],
             'reference_mic': [1.3, 1.05, 0.9],
-            'speaker': [4.2, 1.05, 0.7],
-            'error_mic': [4.7, 0.85, 1.1],
-        },
-    },
-    'Small Room': {
-        'dimensions': [4.0, 3.0, 2.5],
-        'absorption': 0.3,
-        'max_order': 3,
-        'positions': {
-            'noise_source': [0.5, 1.5, 1.0],
-            'reference_mic': [1.2, 1.5, 1.0],
-            'speaker': [2.8, 1.5, 1.2],
-            'error_mic': [3.5, 1.5, 1.2],
-        },
-    },
-    'Large Room': {
-        'dimensions': [8.0, 6.0, 3.0],
-        'absorption': 0.2,
-        'max_order': 4,
-        'positions': {
-            'noise_source': [0.5, 3.0, 1.5],
-            'reference_mic': [2.0, 3.0, 1.5],
-            'speaker': [5.5, 3.0, 1.5],
-            'error_mic': [7.0, 3.0, 1.5],
-        },
-    },
-    'Anechoic': {
-        'dimensions': [5.0, 4.0, 3.0],
-        'absorption': 0.99,
-        'max_order': 0,
-        'positions': {
-            'noise_source': [0.5, 2.0, 1.5],
-            'reference_mic': [1.5, 2.0, 1.5],
-            'speaker': [3.5, 2.0, 1.5],
-            'error_mic': [4.5, 2.0, 1.5],
+            'speaker': [0.9, 0.30, 1.0],  # Dashboard driver side (steering wheel area)
+            'error_mic': [2.8, 0.6, 1.2],  # Driver headrest
         },
     },
 }
@@ -115,6 +82,14 @@ SCENARIO_PRESETS = {
         'road_weight': 0.3,
         'wind_weight': 0.3,
         'description': 'Custom settings',
+    },
+    'Dynamic Ride': {
+        'rpm': 0,
+        'speed': 0,
+        'engine_weight': 0,
+        'road_weight': 0,
+        'wind_weight': 0,
+        'description': 'Random sequence of all scenarios',
     },
 }
 
@@ -273,4 +248,59 @@ SPEAKER_MODES = {
         'description': '4 speakers working together (front doors + dashboard)',
         'num_speakers': 4,
     },
+}
+
+# =============================================================================
+# NOISE SOURCE POSITIONS (simulating external noise entry points)
+# =============================================================================
+# Since pyroomacoustics requires sources inside the room, we place them
+# at boundary walls to simulate external noise sources
+
+NOISE_SOURCE_POSITIONS = {
+    'Engine (Firewall)': [0.15, 0.92, 0.5],      # Front wall center - engine noise
+    'Road (Floor)': [2.0, 0.92, 0.12],           # Floor center - road/tire noise
+    'Wind (A-Pillar)': [0.5, 0.12, 1.0],         # A-pillar left - wind noise
+    'Combined (Dashboard)': [0.5, 0.92, 0.5],   # Dashboard area - mixed noise
+}
+
+# Map driving scenarios to noise source positions
+SCENARIO_NOISE_POSITIONS = {
+    'Highway': 'Road (Floor)',        # Road noise dominant at highway speeds
+    'City': 'Combined (Dashboard)',   # Mixed noise in city
+    'Acceleration': 'Engine (Firewall)',  # Engine noise during acceleration
+    'Idle': 'Engine (Firewall)',      # Engine noise when idling
+    'Custom': 'Combined (Dashboard)', # Default to combined
+    'Dynamic Ride': 'Combined (Dashboard)',  # Mixed for dynamic scenario
+}
+
+# =============================================================================
+# 4-REFERENCE MIC CONFIGURATION
+# =============================================================================
+# Strategic positions for detecting different noise types
+
+FOUR_REF_MIC_CONFIG = {
+    'firewall': [0.3, 0.92, 0.5],     # Near firewall - engine noise
+    'floor': [2.0, 0.55, 0.15],       # Under seat area - road/tire noise
+    'a_pillar': [0.5, 0.15, 1.0],     # A-pillar - wind noise
+    'dashboard': [0.9, 0.92, 0.8],    # Dashboard center - general
+}
+
+# Reference mic mode options
+REF_MIC_MODES = {
+    'Single Reference Mic': {
+        'description': 'One reference mic (position adjustable)',
+        'num_mics': 1,
+    },
+    '4-Reference Mic System': {
+        'description': '4 strategic mics for different noise types (averaged)',
+        'num_mics': 4,
+    },
+}
+
+# Styling for 4-ref mic visualization
+REF_MIC_4CH_CONFIG = {
+    'firewall': {'color': '#e67e22', 'name': 'Firewall (Engine)'},
+    'floor': {'color': '#9b59b6', 'name': 'Floor (Road)'},
+    'a_pillar': {'color': '#1abc9c', 'name': 'A-Pillar (Wind)'},
+    'dashboard': {'color': '#3498db', 'name': 'Dashboard (General)'},
 }

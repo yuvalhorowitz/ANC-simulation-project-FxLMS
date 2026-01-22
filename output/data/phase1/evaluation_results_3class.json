@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-01-18T14:03:30.532951",
+  "baseline_step_size": 0.005,
+  "comparison": {
+    "significant": true,
+    "p_value": 0.008033219568468742,
+    "mean_improvement": 0.4088589619668772,
+    "std_improvement": 0.7734814879196256,
+    "cohens_d": 0.5285956655713829,
+    "win_rate": 0.5666666666666667,
+    "n_samples": 30
+  },
+  "per_scenario": {
+    "idle": {
+      "baseline_mean_nr": 4.89396840957019,
+      "adaptive_mean_nr": 6.195781827633203,
+      "adaptive_mean_mu": 0.0126
+    },
+    "city": {
+      "baseline_mean_nr": 13.5734267278211,
+      "adaptive_mean_nr": 13.620346890364402,
+      "adaptive_mean_mu": 0.004000000000000001
+    },
+    "highway": {
+      "baseline_mean_nr": 4.363205707762349,
+      "adaptive_mean_nr": 4.241049013056669,
+      "adaptive_mean_mu": 0.004450000000000001
+    }
+  },
+  "phase1_criteria": {
+    "mean_improvement_db": {
+      "value": 0.4088589619668772,
+      "target": 1.0,
+      "passed": false
+    },
+    "worst_case_drop_db": {
+      "value": -0.12215669470568002,
+      "target": -0.5,
+      "passed": true
+    },
+    "stability_rate": {
+      "value": 0.8333333333333334,
+      "target": 0.99,
+      "passed": false
+    },
+    "convergence_speedup": {
+      "value": 0.0,
+      "target": 1.1,
+      "passed": false
+    }
+  },
+  "phase1_passed": false
+}

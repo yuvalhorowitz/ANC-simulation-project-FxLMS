@@ -1,0 +1,33 @@
+Phase 1: Filter Length Optimization Results
+Generated: 2026-01-21T13:49:20.475761
+============================================================
+
+Configuration: Compact Car
+  Scenario: highway
+  Estimated RT60: 168 ms
+  Baseline filter: 256 taps
+  Optimal filter: 2048 taps
+  Baseline NR: 6.6 dB
+  Optimized NR: 5.9 dB
+  Improvement: -0.7 dB
+
+Configuration: Sedan
+  Scenario: city
+  Estimated RT60: 180 ms
+  Baseline filter: 256 taps
+  Optimal filter: 2048 taps
+  Baseline NR: 10.2 dB
+  Optimized NR: 11.7 dB
+  Improvement: +1.5 dB
+
+Configuration: SUV
+  Scenario: acceleration
+  Estimated RT60: 209 ms
+  Baseline filter: 320 taps
+  Optimal filter: 2048 taps
+  Baseline NR: 22.9 dB
+  Optimized NR: 22.4 dB
+  Improvement: -0.5 dB
+
+
+Average Improvement: +0.1 dB

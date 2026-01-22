@@ -1,0 +1,21 @@
+Phase 3: Step Size Grid Search Results
+Generated: 2026-01-21T13:57:16.679754
+============================================================
+
+Compact Car:
+  Baseline: μ=0.005, NR=5.3 dB
+  Optimal:  μ=0.007, NR=9.1 dB
+  Improvement: +3.9 dB
+
+Sedan:
+  Baseline: μ=0.005, NR=9.1 dB
+  Optimal:  μ=0.01, NR=12.2 dB
+  Improvement: +3.1 dB
+
+SUV:
+  Baseline: μ=0.003, NR=22.2 dB
+  Optimal:  μ=0.003, NR=22.2 dB
+  Improvement: +0.0 dB
+
+
+Average improvement: +2.3 dB

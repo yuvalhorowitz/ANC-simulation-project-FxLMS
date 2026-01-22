@@ -7,6 +7,7 @@ Road noise characteristics:
 - Broadband (not tonal like engine)
 - Tire cavity resonance around 200-250 Hz
 - Increases with speed
+- Extended frequency range: 20-1000 Hz for better ML training
 """
 
 import numpy as np
@@ -50,9 +51,9 @@ class RoadNoiseGenerator:
         # Base broadband noise
         noise = np.random.randn(n_samples)
 
-        # Bandpass filter to 20-300 Hz range
+        # Bandpass filter to 20-1000 Hz range (extended for ML training)
         low = 20 / nyq
-        high = min(300 / nyq, 0.99)
+        high = min(1000 / nyq, 0.99)
 
         if high > low:
             b, a = scipy_signal.butter(4, [low, high], btype='band')

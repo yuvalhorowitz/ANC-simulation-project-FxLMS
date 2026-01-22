@@ -87,13 +87,13 @@ class NoiseMixer:
             Noise signal for scenario
         """
         scenarios = {
-            'highway': {'rpm': 2800, 'speed': 120,
+            'highway': {'rpm': 2800, 'speed': 120, 'amplitude': 0.8,
                        'mix': {'engine': 0.3, 'road': 0.4, 'wind': 0.3}},
-            'city': {'rpm': 2000, 'speed': 50,
+            'city': {'rpm': 2000, 'speed': 50, 'amplitude': 0.5,
                     'mix': {'engine': 0.5, 'road': 0.35, 'wind': 0.15}},
-            'acceleration': {'rpm': 4500, 'speed': 80,
+            'acceleration': {'rpm': 4500, 'speed': 80, 'amplitude': 1.0,
                            'mix': {'engine': 0.7, 'road': 0.2, 'wind': 0.1}},
-            'idle': {'rpm': 800, 'speed': 0,
+            'idle': {'rpm': 800, 'speed': 0, 'amplitude': 0.2,
                     'mix': {'engine': 0.9, 'road': 0.05, 'wind': 0.05}}
         }
 
@@ -103,5 +103,40 @@ class NoiseMixer:
             duration,
             rpm=params['rpm'],
             speed_kmh=params['speed'],
-            mix_weights=params['mix']
+            mix_weights=params['mix'],
+            amplitude=params['amplitude']
         )
+
+    def generate_dynamic_scenario(self, duration: float, seed: int = None) -> tuple:
+        """
+        Generate a dynamic ride with randomly ordered scenarios.
+
+        Creates a sequence of all 4 scenarios (idle, city, highway, acceleration)
+        in random order, useful for testing ANC adaptation to changing conditions.
+
+        Args:
+            duration: Total duration in seconds (divided equally among scenarios)
+            seed: Optional random seed for reproducibility
+
+        Returns:
+            Tuple of (noise_signal, scenario_order) where scenario_order is a list
+            of scenario names in the order they appear
+        """
+        import random
+        if seed is not None:
+            random.seed(seed)
+
+        scenario_names = ['idle', 'city', 'highway', 'acceleration']
+        random.shuffle(scenario_names)
+
+        segment_duration = duration / len(scenario_names)
+        segments = []
+
+        for scenario in scenario_names:
+            segment = self.generate_scenario(segment_duration, scenario)
+            segments.append(segment)
+
+        # Concatenate all segments
+        combined = np.concatenate(segments)
+
+        return combined, scenario_names

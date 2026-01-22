@@ -26,6 +26,55 @@ from src.ml.phase1_step_size.feature_extractor import extract_features
 from src.ml.common.metrics import noise_reduction_db, convergence_time, stability_score
 
 
+def select_best_step_size(results: List[Dict]) -> float:
+    """
+    Select best μ using Pareto ranking that balances NR and convergence speed.
+
+    Uses a weighted combination: 60% NR + 40% convergence speed.
+    This prevents bias toward extreme step sizes and encourages
+    learning scenario-specific patterns.
+
+    Args:
+        results: List of dicts with step_size, noise_reduction_db,
+                 convergence_time, stability_score
+
+    Returns:
+        Best step size value
+    """
+    # Filter for highly stable runs (stability > 0.8)
+    stable = [r for r in results if r['stability_score'] > 0.8]
+
+    if not stable:
+        # If nothing is highly stable, use moderate stability threshold
+        stable = [r for r in results if r['stability_score'] > 0.5]
+
+    if not stable:
+        # If still nothing stable, return conservative default
+        return 0.005
+
+    # Normalize metrics to [0, 1] scale
+    nr_vals = [r['noise_reduction_db'] for r in stable]
+    conv_vals = [r['convergence_time'] for r in stable]
+
+    nr_min, nr_max = min(nr_vals), max(nr_vals)
+    conv_min, conv_max = min(conv_vals), max(conv_vals)
+
+    # Avoid division by zero
+    nr_range = nr_max - nr_min if nr_max > nr_min else 1.0
+    conv_range = conv_max - conv_min if conv_max > conv_min else 1.0
+
+    # Normalize: higher is better for both metrics
+    nr_norm = [(v - nr_min) / nr_range for v in nr_vals]
+    conv_norm = [(conv_max - v) / conv_range for v in conv_vals]  # Invert: lower time = better
+
+    # Combined score: 60% NR + 40% convergence speed
+    scores = [0.6 * nr + 0.4 * conv for nr, conv in zip(nr_norm, conv_norm)]
+
+    # Select step size with highest combined score
+    best_idx = np.argmax(scores)
+    return stable[best_idx]['step_size']
+
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -47,14 +96,14 @@ REF_MIC_POS = [0.3, 0.92, 0.5]
 SPEAKER_POS = [1.9, 0.55, 1.0]
 ERROR_MIC_POS = [1.8, 0.55, 1.0]
 
-# Step sizes to test
-STEP_SIZES = [0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05]
+# Step sizes to test (5 values that occur as optimal in practice)
+STEP_SIZES = [0.003, 0.005, 0.007, 0.01, 0.015]
 
 # Scenarios to test
 SCENARIOS = ['idle', 'city', 'highway']
 
 # Number of variations per scenario
-N_VARIATIONS = 50  # Increased for better model training
+N_VARIATIONS = 200  # 600 total samples (200 per scenario)
 
 # Simulation parameters
 FS = 16000
@@ -211,8 +260,16 @@ def collect_data() -> List[Dict[str, Any]]:
             np.random.seed(42 + variation)
             noise_signal = noise_gen.generate_scenario(DURATION, scenario)
 
-            # Extract features from first second
-            features = extract_features(noise_signal[:FS], FS)
+            # CRITICAL FIX: Extract features from REFERENCE-FILTERED signal
+            # (matching what the model sees during deployment)
+            # Filter first second through reference path
+            reference_path = FIRPath(paths['reference'])
+            ref_signal = np.zeros(FS)
+            for i in range(min(FS, len(noise_signal))):
+                ref_signal[i] = reference_path.filter_sample(noise_signal[i])
+
+            # Extract features from reference-filtered signal
+            features = extract_features(ref_signal, FS)
 
             # Test each step size
             results_for_scenario = []
@@ -232,17 +289,8 @@ def collect_data() -> List[Dict[str, Any]]:
                     'stability_score': result['stability_score'],
                 })
 
-            # Find best step size (highest NR with stability)
-            stable_results = [
-                r for r in results_for_scenario
-                if r['stability_score'] > 0.5
-            ]
-
-            if stable_results:
-                best = max(stable_results, key=lambda x: x['noise_reduction_db'])
-                best_step_size = best['step_size']
-            else:
-                best_step_size = 0.005  # Fallback
+            # Find best step size (max NR among stable runs)
+            best_step_size = select_best_step_size(results_for_scenario)
 
             # Create training sample
             sample = {

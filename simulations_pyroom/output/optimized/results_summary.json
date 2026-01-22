@@ -1,0 +1,243 @@
+{
+  "sedan": {
+    "single": {
+      "idle": {
+        "noise_reduction_db": 16.497743111009044,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.005,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": 14.513844206817136,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.005,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": 3.9446856543303417,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.005,
+        "duration": 5.0
+      }
+    },
+    "quad_stereo": {
+      "idle": {
+        "noise_reduction_db": -590.3118799263331,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.005,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": -677.9132144323321,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.005,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": -592.5303810951447,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.005,
+        "duration": 5.0
+      }
+    }
+  },
+  "suv": {
+    "single": {
+      "idle": {
+        "noise_reduction_db": 9.275548987046216,
+        "filter_length": 2048,
+        "max_order": 8,
+        "step_size": 0.003,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": 10.626609268038855,
+        "filter_length": 2048,
+        "max_order": 8,
+        "step_size": 0.003,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": 8.52346711761191,
+        "filter_length": 2048,
+        "max_order": 8,
+        "step_size": 0.003,
+        "duration": 5.0
+      }
+    },
+    "quad_stereo": {
+      "idle": {
+        "noise_reduction_db": -523.1536554584158,
+        "filter_length": 2048,
+        "max_order": 8,
+        "step_size": 0.003,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": 3.142232111423021,
+        "filter_length": 2048,
+        "max_order": 8,
+        "step_size": 0.003,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": -138.25063873129318,
+        "filter_length": 2048,
+        "max_order": 8,
+        "step_size": 0.003,
+        "duration": 5.0
+      }
+    }
+  },
+  "compact": {
+    "single": {
+      "idle": {
+        "noise_reduction_db": 18.860405435705566,
+        "filter_length": 2048,
+        "max_order": 5,
+        "step_size": 0.008,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": 7.9099481251254335,
+        "filter_length": 2048,
+        "max_order": 5,
+        "step_size": 0.008,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": 5.1181396260959655,
+        "filter_length": 2048,
+        "max_order": 5,
+        "step_size": 0.008,
+        "duration": 5.0
+      }
+    },
+    "quad_stereo": {
+      "idle": {
+        "noise_reduction_db": -898.8261740684161,
+        "filter_length": 2048,
+        "max_order": 5,
+        "step_size": 0.008,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": -1693.1429578506745,
+        "filter_length": 2048,
+        "max_order": 5,
+        "step_size": 0.008,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": -500.2660990686078,
+        "filter_length": 2048,
+        "max_order": 5,
+        "step_size": 0.008,
+        "duration": 5.0
+      }
+    }
+  },
+  "damped_room": {
+    "single": {
+      "idle": {
+        "noise_reduction_db": 9.237886569645212,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.007,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": 9.88930862896366,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.007,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": 5.492243306930441,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.007,
+        "duration": 5.0
+      }
+    },
+    "quad_stereo": {
+      "idle": {
+        "noise_reduction_db": -1376.0054785297498,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.007,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": -1366.138864294128,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.007,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": -12.022756943972952,
+        "filter_length": 2048,
+        "max_order": 6,
+        "step_size": 0.007,
+        "duration": 5.0
+      }
+    }
+  },
+  "reverberant_room": {
+    "single": {
+      "idle": {
+        "noise_reduction_db": 8.568033414358258,
+        "filter_length": 2048,
+        "max_order": 15,
+        "step_size": 0.002,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": 16.55188843823709,
+        "filter_length": 2048,
+        "max_order": 15,
+        "step_size": 0.002,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": 2.932466548824463,
+        "filter_length": 2048,
+        "max_order": 15,
+        "step_size": 0.002,
+        "duration": 5.0
+      }
+    },
+    "quad_stereo": {
+      "idle": {
+        "noise_reduction_db": -141.3523421828499,
+        "filter_length": 2048,
+        "max_order": 15,
+        "step_size": 0.002,
+        "duration": 5.0
+      },
+      "city": {
+        "noise_reduction_db": -2.8581237769952788,
+        "filter_length": 2048,
+        "max_order": 15,
+        "step_size": 0.002,
+        "duration": 5.0
+      },
+      "highway": {
+        "noise_reduction_db": 3.7167470065337485,
+        "filter_length": 2048,
+        "max_order": 15,
+        "step_size": 0.002,
+        "duration": 5.0
+      }
+    }
+  },
+  "timestamp": "2026-01-21T13:41:03.417641"
+}

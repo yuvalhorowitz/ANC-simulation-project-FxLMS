@@ -54,8 +54,16 @@ FILTER_LENGTH = 256
 
 # Test scenarios (use different seeds than training)
 TEST_SCENARIOS = ['idle', 'city', 'highway']
-N_TEST_VARIATIONS = 5
+N_TEST_VARIATIONS = 10  # Increased for robust evaluation
 TEST_SEED_OFFSET = 1000  # Different from training
+
+# Phase 1 Success Criteria
+PHASE1_CRITERIA = {
+    'min_mean_improvement_db': 1.0,      # Mean NR improvement >= +1 dB
+    'max_worst_case_drop_db': 0.5,       # Worst case >= baseline - 0.5 dB
+    'min_stability_rate': 0.99,          # Stability >= 99%
+    'min_convergence_speedup': 1.10,     # Convergence >= 10% faster
+}
 
 
 def create_room_simulation(fs: int = FS) -> dict:
@@ -428,8 +436,75 @@ def main():
         json.dump(results_data, f, indent=2)
     print(f"\nSaved results to {results_path}")
 
+    # Check Phase 1 Success Criteria
     print("\n" + "=" * 70)
-    print("EVALUATION COMPLETE")
+    print("PHASE 1 SUCCESS CRITERIA CHECK")
+    print("=" * 70)
+
+    # Compute metrics for criteria check
+    mean_improvement = comparison['mean_improvement']
+    worst_case_improvement = min(
+        np.mean([r['noise_reduction_db'] for r in adaptive_results[s]]) -
+        np.mean([r['noise_reduction_db'] for r in baseline_results[s]])
+        for s in TEST_SCENARIOS
+    )
+
+    # Stability rate
+    all_adaptive_stable = [r['stability_score'] for s in TEST_SCENARIOS for r in adaptive_results[s]]
+    stability_rate = np.mean([s > 0.8 for s in all_adaptive_stable])
+
+    # Convergence speedup
+    all_baseline_conv = [r['convergence_time'] for s in TEST_SCENARIOS for r in baseline_results[s]]
+    all_adaptive_conv = [r['convergence_time'] for s in TEST_SCENARIOS for r in adaptive_results[s]]
+    mean_baseline_conv = np.mean(all_baseline_conv)
+    mean_adaptive_conv = np.mean(all_adaptive_conv)
+    convergence_speedup = mean_baseline_conv / (mean_adaptive_conv + 1)
+
+    criteria_results = {
+        'mean_improvement_db': {
+            'value': float(mean_improvement),
+            'target': float(PHASE1_CRITERIA['min_mean_improvement_db']),
+            'passed': bool(mean_improvement >= PHASE1_CRITERIA['min_mean_improvement_db']),
+        },
+        'worst_case_drop_db': {
+            'value': float(worst_case_improvement),
+            'target': float(-PHASE1_CRITERIA['max_worst_case_drop_db']),
+            'passed': bool(worst_case_improvement >= -PHASE1_CRITERIA['max_worst_case_drop_db']),
+        },
+        'stability_rate': {
+            'value': float(stability_rate),
+            'target': float(PHASE1_CRITERIA['min_stability_rate']),
+            'passed': bool(stability_rate >= PHASE1_CRITERIA['min_stability_rate']),
+        },
+        'convergence_speedup': {
+            'value': float(convergence_speedup),
+            'target': float(PHASE1_CRITERIA['min_convergence_speedup']),
+            'passed': bool(convergence_speedup >= PHASE1_CRITERIA['min_convergence_speedup']),
+        },
+    }
+
+    all_passed = all(c['passed'] for c in criteria_results.values())
+
+    print(f"\n{'Criterion':<25} {'Value':>10} {'Target':>10} {'Status':>10}")
+    print("-" * 60)
+    print(f"{'Mean NR Improvement':<25} {mean_improvement:>+10.2f} dB {'>=' + str(PHASE1_CRITERIA['min_mean_improvement_db']):>10} {'PASS' if criteria_results['mean_improvement_db']['passed'] else 'FAIL':>10}")
+    print(f"{'Worst-Case Improvement':<25} {worst_case_improvement:>+10.2f} dB {'>=' + str(-PHASE1_CRITERIA['max_worst_case_drop_db']):>10} {'PASS' if criteria_results['worst_case_drop_db']['passed'] else 'FAIL':>10}")
+    print(f"{'Stability Rate':<25} {stability_rate*100:>10.1f}% {'>=' + str(int(PHASE1_CRITERIA['min_stability_rate']*100)) + '%':>10} {'PASS' if criteria_results['stability_rate']['passed'] else 'FAIL':>10}")
+    print(f"{'Convergence Speedup':<25} {convergence_speedup:>10.2f}x {'>=' + str(PHASE1_CRITERIA['min_convergence_speedup']) + 'x':>10} {'PASS' if criteria_results['convergence_speedup']['passed'] else 'FAIL':>10}")
+
+    # Add criteria results to saved data
+    results_data['phase1_criteria'] = criteria_results
+    results_data['phase1_passed'] = all_passed
+    with open(results_path, 'w') as f:
+        json.dump(results_data, f, indent=2)
+
+    print("\n" + "=" * 70)
+    if all_passed:
+        print("PHASE 1 VALIDATION: PASSED")
+        print("Proceed to Phase 2: Noise Classification")
+    else:
+        print("PHASE 1 VALIDATION: NOT YET PASSED")
+        print("Consider: more training data, hyperparameter tuning, or model architecture changes")
     print("=" * 70)
 
 

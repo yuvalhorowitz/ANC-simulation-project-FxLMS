@@ -12,7 +12,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from presets import (
     ROOM_PRESETS, SCENARIO_PRESETS, NOISE_PRESETS,
-    FXLMS_PRESETS, DEFAULTS, FOUR_SPEAKER_CONFIG, SPEAKER_MODES
+    FXLMS_PRESETS, DEFAULTS, FOUR_SPEAKER_CONFIG, SPEAKER_MODES,
+    FOUR_REF_MIC_CONFIG, REF_MIC_MODES, NOISE_SOURCE_POSITIONS,
+    SCENARIO_NOISE_POSITIONS
 )
 
 
@@ -31,6 +33,12 @@ def init_session_state():
         st.session_state.absorption = preset['absorption']
         st.session_state.max_order = preset['max_order']
         st.session_state.positions = {k: v.copy() for k, v in preset['positions'].items()}
+
+        # Override noise source position based on default scenario
+        default_scenario = DEFAULTS['scenario_preset']
+        noise_pos_key = SCENARIO_NOISE_POSITIONS.get(default_scenario, 'Combined (Dashboard)')
+        auto_noise_pos = NOISE_SOURCE_POSITIONS[noise_pos_key]
+        st.session_state.positions['noise_source'] = auto_noise_pos.copy()
 
         # FxLMS defaults
         fxlms = FXLMS_PRESETS[DEFAULTS['fxlms_preset']]
@@ -67,11 +75,17 @@ def on_room_preset_change():
     st.session_state.absorption_val = preset['absorption']
     st.session_state.max_order_val = preset['max_order']
 
-    # Update positions
-    for key, pos in preset['positions'].items():
-        st.session_state[f'pos_{key}_x'] = pos[0]
-        st.session_state[f'pos_{key}_y'] = pos[1]
-        st.session_state[f'pos_{key}_z'] = pos[2]
+    # Reset interactive positions to preset positions
+    st.session_state.interactive_positions = {
+        k: v.copy() for k, v in preset['positions'].items()
+    }
+
+    # Delete slider keys so they get re-initialized with new values
+    for comp_name in preset['positions'].keys():
+        for axis in ['x', 'y', 'z']:
+            key = f"drag_{comp_name}_{axis}"
+            if key in st.session_state:
+                del st.session_state[key]
 
     st.session_state.params_changed = True
 
@@ -84,6 +98,27 @@ def on_fxlms_preset_change():
     st.session_state.fxlms_preset = preset_name
     st.session_state.filter_length_val = preset['filter_length']
     st.session_state.step_size_val = preset['step_size']
+    st.session_state.params_changed = True
+
+
+def on_scenario_change():
+    """Callback when driving scenario changes - update noise source position."""
+    scenario_name = st.session_state.scenario_select
+
+    # Get noise position for this scenario
+    noise_pos_key = SCENARIO_NOISE_POSITIONS.get(scenario_name, 'Combined (Dashboard)')
+    auto_noise_pos = NOISE_SOURCE_POSITIONS[noise_pos_key]
+
+    # Update noise source position in interactive_positions
+    if 'interactive_positions' in st.session_state:
+        st.session_state.interactive_positions['noise_source'] = auto_noise_pos.copy()
+
+    # Directly set slider key values to the new position
+    # This ensures sliders update immediately
+    st.session_state['drag_noise_source_x'] = float(auto_noise_pos[0])
+    st.session_state['drag_noise_source_y'] = float(auto_noise_pos[1])
+    st.session_state['drag_noise_source_z'] = float(auto_noise_pos[2])
+
     st.session_state.params_changed = True
 
 
@@ -105,11 +140,11 @@ def render_sidebar() -> Dict[str, Any]:
     params = {}
 
     # ==================== Room Configuration ====================
-    st.sidebar.header("🏠 Room")
+    st.sidebar.header("🚗 Car")
 
     # Room preset selector
     room_preset = st.sidebar.selectbox(
-        "Room Preset",
+        "Car Type",
         options=list(ROOM_PRESETS.keys()),
         index=list(ROOM_PRESETS.keys()).index(st.session_state.get('room_preset', DEFAULTS['room_preset'])),
         key="room_preset_select",
@@ -119,7 +154,7 @@ def render_sidebar() -> Dict[str, Any]:
     preset = ROOM_PRESETS[room_preset]
 
     # Dimensions - use session state with defaults from preset
-    st.sidebar.subheader("Dimensions")
+    st.sidebar.subheader("Car Dimensions")
 
     length = st.sidebar.slider(
         "Length (m)", 2.0, 10.0,
@@ -142,7 +177,7 @@ def render_sidebar() -> Dict[str, Any]:
     params['dimensions'] = [length, width, height]
 
     # Acoustic properties
-    st.sidebar.subheader("Acoustics")
+    st.sidebar.subheader("Car Acoustics")
     params['absorption'] = st.sidebar.slider(
         "Absorption", 0.1, 0.99,
         value=st.session_state.get('absorption_val', preset['absorption']),
@@ -158,11 +193,8 @@ def render_sidebar() -> Dict[str, Any]:
         on_change=on_param_change
     )
 
-    # ==================== Position Configuration ====================
-    st.sidebar.header("📍 Positions")
-
     # ==================== Speaker Mode ====================
-    st.sidebar.subheader("Speaker Setup")
+    st.sidebar.header("🔊 Speaker Setup")
     speaker_mode = st.sidebar.radio(
         "Speaker Mode",
         options=list(SPEAKER_MODES.keys()),
@@ -178,83 +210,100 @@ def render_sidebar() -> Dict[str, Any]:
     st.sidebar.caption(mode_info['description'])
 
     if speaker_mode == '4-Speaker System':
-        params['speakers'] = FOUR_SPEAKER_CONFIG.copy()
+        # Show toggles for each speaker
+        st.sidebar.markdown("**Enable/Disable Speakers:**")
 
-    # Constrain positions to room dimensions
-    def pos_slider(label, key_base, default_pos, dim_max):
-        col1, col2, col3 = st.sidebar.columns(3)
-        x = col1.number_input(
-            "X", 0.1, length-0.1,
-            value=min(st.session_state.get(f'{key_base}_x', default_pos[0]), length-0.1),
-            step=0.1, key=f'{key_base}_x',
-            on_change=on_param_change
-        )
-        y = col2.number_input(
-            "Y", 0.1, width-0.1,
-            value=min(st.session_state.get(f'{key_base}_y', default_pos[1]), width-0.1),
-            step=0.1, key=f'{key_base}_y',
-            on_change=on_param_change
-        )
-        z = col3.number_input(
-            "Z", 0.1, height-0.1,
-            value=min(st.session_state.get(f'{key_base}_z', default_pos[2]), height-0.1),
-            step=0.1, key=f'{key_base}_z',
-            on_change=on_param_change
-        )
-        return [x, y, z]
+        enabled_speakers = {}
+        speaker_names = {
+            'front_left': 'Front Left (Door)',
+            'front_right': 'Front Right (Door)',
+            'dash_left': 'Dash Left',
+            'dash_right': 'Dash Right',
+        }
 
-    with st.sidebar.expander("Position Details", expanded=False):
-        st.markdown("**Noise Source**")
-        noise_pos = pos_slider("Noise", "pos_noise_source", preset['positions']['noise_source'], params['dimensions'])
+        col1, col2 = st.sidebar.columns(2)
+        for i, (key, label) in enumerate(speaker_names.items()):
+            col = col1 if i % 2 == 0 else col2
+            # Default all speakers to enabled
+            default_enabled = st.session_state.get(f'speaker_{key}_enabled', True)
+            enabled = col.checkbox(
+                label.split('(')[0].strip(),  # Short label
+                value=default_enabled,
+                key=f'speaker_{key}_enabled',
+                on_change=on_param_change,
+                help=label
+            )
+            if enabled:
+                enabled_speakers[key] = FOUR_SPEAKER_CONFIG[key].copy()
 
-        st.markdown("**Reference Mic**")
-        ref_pos = pos_slider("Ref", "pos_reference_mic", preset['positions']['reference_mic'], params['dimensions'])
-
-        # Only show single speaker position if in single speaker mode
-        if speaker_mode == 'Single Speaker':
-            st.markdown("**Speaker**")
-            spk_pos = pos_slider("Spk", "pos_speaker", preset['positions']['speaker'], params['dimensions'])
+        if enabled_speakers:
+            params['speakers'] = enabled_speakers
         else:
-            # Show 4-speaker positions (fixed, not editable)
-            st.markdown("**4 Speakers (Fixed)**")
-            for name, pos in FOUR_SPEAKER_CONFIG.items():
-                st.markdown(f"- {name.replace('_', ' ').title()}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
-            spk_pos = [2.0, 0.92, 0.6]  # Placeholder, not used in 4-speaker mode
+            st.sidebar.warning("⚠️ Enable at least one speaker")
+            params['speakers'] = {'front_left': FOUR_SPEAKER_CONFIG['front_left'].copy()}
+    else:
+        # Clear 4-speaker config when switching to single speaker
+        params['speakers'] = None
+        if 'speakers' in st.session_state:
+            del st.session_state['speakers']
 
-        st.markdown("**Error Mic (Ear)**")
-        err_pos = pos_slider("Err", "pos_error_mic", preset['positions']['error_mic'], params['dimensions'])
+    # ==================== Reference Mic Mode ====================
+    st.sidebar.header("🎤 Reference Mic Setup")
+    ref_mic_mode = st.sidebar.radio(
+        "Reference Mic Mode",
+        options=list(REF_MIC_MODES.keys()),
+        index=0 if st.session_state.get('ref_mic_mode', 'Single Reference Mic') == 'Single Reference Mic' else 1,
+        key="ref_mic_mode_select",
+        on_change=on_param_change,
+        help="Single or 4 strategic reference mics"
+    )
+    st.session_state.ref_mic_mode = ref_mic_mode
+    params['ref_mic_mode'] = ref_mic_mode
 
-        params['positions'] = {
-            'noise_source': noise_pos,
-            'reference_mic': ref_pos,
-            'speaker': spk_pos,
-            'error_mic': err_pos,
+    mode_info = REF_MIC_MODES[ref_mic_mode]
+    st.sidebar.caption(mode_info['description'])
+
+    if ref_mic_mode == '4-Reference Mic System':
+        # Show toggles for each reference mic
+        st.sidebar.markdown("**Enable/Disable Ref Mics:**")
+
+        enabled_ref_mics = {}
+        ref_mic_names = {
+            'firewall': 'Firewall (Engine)',
+            'floor': 'Floor (Road)',
+            'a_pillar': 'A-Pillar (Wind)',
+            'dashboard': 'Dashboard (General)',
         }
 
-    # Use preset positions if expander not opened
-    if 'positions' not in params:
-        params['positions'] = {
-            'noise_source': [
-                st.session_state.get('pos_noise_source_x', preset['positions']['noise_source'][0]),
-                st.session_state.get('pos_noise_source_y', preset['positions']['noise_source'][1]),
-                st.session_state.get('pos_noise_source_z', preset['positions']['noise_source'][2]),
-            ],
-            'reference_mic': [
-                st.session_state.get('pos_reference_mic_x', preset['positions']['reference_mic'][0]),
-                st.session_state.get('pos_reference_mic_y', preset['positions']['reference_mic'][1]),
-                st.session_state.get('pos_reference_mic_z', preset['positions']['reference_mic'][2]),
-            ],
-            'speaker': [
-                st.session_state.get('pos_speaker_x', preset['positions']['speaker'][0]),
-                st.session_state.get('pos_speaker_y', preset['positions']['speaker'][1]),
-                st.session_state.get('pos_speaker_z', preset['positions']['speaker'][2]),
-            ],
-            'error_mic': [
-                st.session_state.get('pos_error_mic_x', preset['positions']['error_mic'][0]),
-                st.session_state.get('pos_error_mic_y', preset['positions']['error_mic'][1]),
-                st.session_state.get('pos_error_mic_z', preset['positions']['error_mic'][2]),
-            ],
-        }
+        col1, col2 = st.sidebar.columns(2)
+        for i, (key, label) in enumerate(ref_mic_names.items()):
+            col = col1 if i % 2 == 0 else col2
+            # Default all ref mics to enabled
+            default_enabled = st.session_state.get(f'ref_mic_{key}_enabled', True)
+            enabled = col.checkbox(
+                label.split('(')[0].strip(),  # Short label
+                value=default_enabled,
+                key=f'ref_mic_{key}_enabled',
+                on_change=on_param_change,
+                help=label
+            )
+            if enabled:
+                enabled_ref_mics[key] = FOUR_REF_MIC_CONFIG[key].copy()
+
+        if enabled_ref_mics:
+            params['ref_mics'] = enabled_ref_mics
+        else:
+            st.sidebar.warning("⚠️ Enable at least one ref mic")
+            params['ref_mics'] = {'firewall': FOUR_REF_MIC_CONFIG['firewall'].copy()}
+    else:
+        # Clear 4-ref-mic config when switching to single ref mic
+        params['ref_mics'] = None
+
+    # Use interactive positions if available, otherwise use preset
+    if 'interactive_positions' in st.session_state:
+        params['positions'] = st.session_state.interactive_positions.copy()
+    else:
+        params['positions'] = {k: v.copy() for k, v in preset['positions'].items()}
 
     # ==================== Noise Configuration ====================
     st.sidebar.header("🔊 Noise")
@@ -264,13 +313,26 @@ def render_sidebar() -> Dict[str, Any]:
         options=list(SCENARIO_PRESETS.keys()),
         index=list(SCENARIO_PRESETS.keys()).index(st.session_state.get('scenario_preset', DEFAULTS['scenario_preset'])),
         key="scenario_select",
-        on_change=on_param_change
+        on_change=on_scenario_change
     )
     scenario = SCENARIO_PRESETS[scenario_name]
     st.sidebar.caption(scenario['description'])
 
     params['scenario'] = scenario_name.lower()
     params['noise_mode'] = 'scenario'
+
+    # Get scenario-based noise position (for display and initial setup only)
+    noise_pos_key = SCENARIO_NOISE_POSITIONS.get(scenario_name, 'Combined (Dashboard)')
+    auto_noise_pos = NOISE_SOURCE_POSITIONS[noise_pos_key]
+
+    # Only set noise position on first load (when interactive_positions doesn't exist yet)
+    # After that, let the user adjust it manually via sliders
+    # Scenario changes are handled by on_scenario_change() callback
+    if 'interactive_positions' not in st.session_state:
+        # First load - set noise position based on scenario
+        params['positions']['noise_source'] = auto_noise_pos.copy()
+
+    st.sidebar.caption(f"📍 Default noise source: {noise_pos_key}")
 
     # ==================== FxLMS Parameters ====================
     st.sidebar.header("⚙️ FxLMS Algorithm")
@@ -295,7 +357,7 @@ def render_sidebar() -> Dict[str, Any]:
 
     params['step_size'] = st.sidebar.select_slider(
         "Step Size (μ)",
-        options=[0.0005, 0.001, 0.002, 0.003, 0.005, 0.01, 0.02, 0.05],
+        options=[0.001, 0.003, 0.005, 0.007, 0.01, 0.015, 0.02],
         value=st.session_state.get('step_size_val', fxlms['step_size']),
         key="step_size_val",
         format_func=lambda x: f"{x:.4f}",
@@ -305,14 +367,29 @@ def render_sidebar() -> Dict[str, Any]:
     # ==================== Simulation Settings ====================
     st.sidebar.header("⏱️ Simulation")
 
+    # Adjust duration limits for Dynamic Ride (needs at least 2s per scenario)
+    is_dynamic_ride = scenario_name == 'Dynamic Ride'
+    min_duration = 8.0 if is_dynamic_ride else 2.0
+    max_duration = 20.0 if is_dynamic_ride else 10.0
+
+    # Clamp current value to valid range
+    current_duration = st.session_state.get('duration_val', DEFAULTS['duration'])
+    current_duration = max(min_duration, min(max_duration, current_duration))
+
     params['duration'] = st.sidebar.slider(
         "Duration (seconds)",
-        2.0, 10.0,
-        value=st.session_state.get('duration_val', DEFAULTS['duration']),
+        min_value=min_duration,
+        max_value=max_duration,
+        value=current_duration,
         step=0.5,
         key="duration_val",
         on_change=on_param_change
     )
+
+    # Show segment info for Dynamic Ride
+    if is_dynamic_ride:
+        segment_duration = params['duration'] / 4
+        st.sidebar.info(f"4 scenarios × {segment_duration:.1f}s each")
 
     params['sample_rate'] = 16000  # Fixed
 

@@ -1,0 +1,86 @@
+ANC CONFIGURATION COMPARISON TEST - SUMMARY REPORT
+Generated: 2026-01-21 17:50:34
+======================================================================
+
+CONFIGURATIONS:
+  1ref_1spk: 1 Reference Mic / 1 Speaker (baseline)
+  1ref_4spk: 1 Reference Mic / 4 Speakers
+  4ref_4spk: 4 Reference Mics / 4 Speakers
+
+SCENARIOS:
+  Highway: Highway cruising at 120 km/h
+  City: City driving at 50 km/h
+  Acceleration: Hard acceleration
+  Idle: Engine idling, stationary
+
+======================================================================
+NOISE REDUCTION RESULTS (dB)
+======================================================================
+
+Configuration       Highway        City           Acceleration   Idle           
+----------------------------------------------------------------------
+1ref_1spk             0.16 dB        0.69 dB        6.99 dB        2.38 dB      
+1ref_4spk             2.95 dB        1.83 dB        9.19 dB        6.55 dB      
+4ref_4spk             5.98 dB        8.87 dB       19.88 dB        5.58 dB      
+
+======================================================================
+DETAILED RESULTS
+======================================================================
+
+
+1ref_1spk:
+----------------------------------------
+  Highway:
+    Noise Reduction: 0.16 dB
+    Final MSE: 7.67e-02
+    Filter Taps: 256
+  City:
+    Noise Reduction: 0.69 dB
+    Final MSE: 6.55e-02
+    Filter Taps: 256
+  Acceleration:
+    Noise Reduction: 6.99 dB
+    Final MSE: 4.82e-02
+    Filter Taps: 256
+  Idle:
+    Noise Reduction: 2.38 dB
+    Final MSE: 1.10e-01
+    Filter Taps: 256
+
+1ref_4spk:
+----------------------------------------
+  Highway:
+    Noise Reduction: 2.95 dB
+    Final MSE: 5.72e-01
+    Filter Taps: 256
+  City:
+    Noise Reduction: 1.83 dB
+    Final MSE: 1.20e-02
+    Filter Taps: 256
+  Acceleration:
+    Noise Reduction: 9.19 dB
+    Final MSE: 3.81e-02
+    Filter Taps: 256
+  Idle:
+    Noise Reduction: 6.55 dB
+    Final MSE: 2.29e-04
+    Filter Taps: 256
+
+4ref_4spk:
+----------------------------------------
+  Highway:
+    Noise Reduction: 5.98 dB
+    Final MSE: 1.42e-01
+    Filter Taps: 256
+  City:
+    Noise Reduction: 8.87 dB
+    Final MSE: 1.91e-05
+    Filter Taps: 256
+  Acceleration:
+    Noise Reduction: 19.88 dB
+    Final MSE: 3.95e-03
+    Filter Taps: 256
+  Idle:
+    Noise Reduction: 5.58 dB
+    Final MSE: 1.46e-01
+    Filter Taps: 256

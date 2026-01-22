@@ -7,6 +7,7 @@ Wind noise characteristics:
 - Low-frequency dominated
 - Turbulent, random
 - Increases with speed (approximately speed^1.5 for amplitude)
+- Extended frequency range: up to 500 Hz for better ML training
 """
 
 import numpy as np
@@ -50,8 +51,8 @@ class WindNoiseGenerator:
         # Base noise
         noise = np.random.randn(n_samples)
 
-        # Low-pass filter (wind noise is low-frequency dominated)
-        cutoff = min(150 / nyq, 0.99)
+        # Low-pass filter (wind noise is low-frequency dominated, extended for ML)
+        cutoff = min(500 / nyq, 0.99)
         if cutoff > 0:
             b, a = scipy_signal.butter(3, cutoff, btype='low')
             noise = scipy_signal.filtfilt(b, a, noise)
