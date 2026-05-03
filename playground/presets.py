@@ -91,6 +91,14 @@ SCENARIO_PRESETS = {
         'wind_weight': 0,
         'description': 'Random sequence of all scenarios',
     },
+    'Real Car Recording': {
+        'rpm': 0,
+        'speed': 0,
+        'engine_weight': 0,
+        'road_weight': 0,
+        'wind_weight': 0,
+        'description': 'Use real recorded car noise audio',
+    },
 }
 
 # Noise type presets (alternative to driving scenarios)
@@ -271,6 +279,7 @@ SCENARIO_NOISE_POSITIONS = {
     'Idle': 'Engine (Firewall)',      # Engine noise when idling
     'Custom': 'Combined (Dashboard)', # Default to combined
     'Dynamic Ride': 'Combined (Dashboard)',  # Mixed for dynamic scenario
+    'Real Car Recording': 'Combined (Dashboard)',  # Default for real recordings
 }
 
 # =============================================================================
@@ -303,4 +312,21 @@ REF_MIC_4CH_CONFIG = {
     'floor': {'color': '#9b59b6', 'name': 'Floor (Road)'},
     'a_pillar': {'color': '#1abc9c', 'name': 'A-Pillar (Wind)'},
     'dashboard': {'color': '#3498db', 'name': 'Dashboard (General)'},
+}
+
+# =============================================================================
+# REAL AUDIO FILES
+# =============================================================================
+import os as _os
+_REAL_NOISES_DIR = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+    'real_noises'
+)
+
+REAL_AUDIO_FILES = {
+    'Real Car 1': _os.path.join(_REAL_NOISES_DIR, 'realcar1.wav'),
+    'Real Car 2': _os.path.join(_REAL_NOISES_DIR, 'realcar2.wav'),
+    'Real Car 3': _os.path.join(_REAL_NOISES_DIR, 'realcar3.wav'),
+    'Real Car 4': _os.path.join(_REAL_NOISES_DIR, 'realcar4.wav'),
+    'Real Car 5': _os.path.join(_REAL_NOISES_DIR, 'realcar5.wav'),
 }

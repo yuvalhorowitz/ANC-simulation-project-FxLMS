@@ -1,53 +1,33 @@
 {
-  "timestamp": "2026-01-18T14:18:33.334051",
+  "timestamp": "2026-01-24T19:24:29.813858",
+  "model_type": "binary",
   "baseline_step_size": 0.005,
-  "comparison": {
-    "significant": true,
-    "p_value": 0.002067681317095844,
-    "mean_improvement": 0.48110883340318455,
-    "std_improvement": 0.7657407933250013,
-    "cohens_d": 0.6282920245782941,
-    "win_rate": 0.7333333333333333,
-    "n_samples": 30
-  },
+  "mu_idle": 0.007,
+  "mu_default": 0.005,
+  "mean_improvement_db": 0.06069540758692874,
+  "worst_case_db": -0.46935079200651586,
+  "win_rate": 0.625,
   "per_scenario": {
     "idle": {
-      "baseline_mean_nr": 4.89396840957019,
-      "adaptive_mean_nr": 6.241207108113068,
-      "adaptive_mean_mu": 0.013000000000000001
+      "baseline_mean_nr": 4.30738606095149,
+      "adaptive_mean_nr": 4.279205138393416,
+      "adaptive_mean_mu": 0.007000000000000001
     },
     "city": {
-      "baseline_mean_nr": 13.5734267278211,
-      "adaptive_mean_nr": 13.651611224296863,
+      "baseline_mean_nr": 6.6408340693940335,
+      "adaptive_mean_nr": 6.714188721788084,
       "adaptive_mean_mu": 0.004999999999999999
     },
     "highway": {
-      "baseline_mean_nr": 4.363205707762349,
-      "adaptive_mean_nr": 4.381109012953262,
+      "baseline_mean_nr": 2.9148324794204514,
+      "adaptive_mean_nr": 2.93095551638651,
+      "adaptive_mean_mu": 0.004999999999999999
+    },
+    "acceleration": {
+      "baseline_mean_nr": 22.161668871581785,
+      "adaptive_mean_nr": 22.343153735127466,
       "adaptive_mean_mu": 0.004999999999999999
     }
   },
-  "phase1_criteria": {
-    "mean_improvement_db": {
-      "value": 0.48110883340318455,
-      "target": 1.0,
-      "passed": false
-    },
-    "worst_case_drop_db": {
-      "value": 0.017903305190912988,
-      "target": -0.5,
-      "passed": true
-    },
-    "stability_rate": {
-      "value": 0.7333333333333333,
-      "target": 0.99,
-      "passed": false
-    },
-    "convergence_speedup": {
-      "value": 0.0,
-      "target": 1.1,
-      "passed": false
-    }
-  },
-  "phase1_passed": false
+  "passed": false
 }

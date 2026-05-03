@@ -269,6 +269,52 @@ def plot_filter_coefficients(results: Dict[str, Any]) -> plt.Figure:
     return fig
 
 
+def plot_filter_coefficients_over_time(results: Dict[str, Any]) -> plt.Figure:
+    """
+    Heatmap showing how filter coefficients evolve over time.
+    """
+    weights_history = results.get('weights_history')
+    if weights_history is None or len(weights_history) == 0:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.text(0.5, 0.5, 'No weight history available', ha='center', va='center')
+        return fig
+
+    n_snapshots, n_taps = weights_history.shape
+    duration = results['duration']
+    time_labels = np.linspace(WEIGHT_SNAPSHOT_INTERVAL_S, duration, n_snapshots)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
+
+    # Heatmap
+    im = ax1.imshow(
+        weights_history.T,
+        aspect='auto',
+        origin='lower',
+        cmap='RdBu_r',
+        extent=[time_labels[0], time_labels[-1], 0, n_taps],
+        vmin=-np.max(np.abs(weights_history)),
+        vmax=np.max(np.abs(weights_history)),
+    )
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel('Tap Index')
+    ax1.set_title(f'Filter Coefficients Over Time ({n_taps} taps, {n_snapshots} snapshots)')
+    fig.colorbar(im, ax=ax1, label='Weight Value')
+
+    # L2 norm of weights over time
+    norms = np.linalg.norm(weights_history, axis=1)
+    ax2.plot(time_labels, norms, 'b-', linewidth=1.5)
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('L2 Norm')
+    ax2.set_title('Filter Weight Magnitude Over Time')
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    return fig
+
+
+WEIGHT_SNAPSHOT_INTERVAL_S = 0.5
+
+
 def plot_noise_reduction_over_time(results: Dict[str, Any]) -> plt.Figure:
     """
     Plot noise reduction in dB over time windows.
@@ -611,3 +657,154 @@ def create_mic_signal_plots(results: Dict[str, Any]) -> Dict[str, plt.Figure]:
         plots['ref_mic_freq'] = plot_ref_mic_signals_freq(results)
 
     return plots
+
+
+def plot_dynamic_ride_signals(results: Dict[str, Any]) -> plt.Figure:
+    """
+    Plot reference and error mic signals for the entire dynamic ride simulation.
+    Shows scenario transitions with vertical lines.
+
+    Args:
+        results: Simulation results dictionary
+
+    Returns:
+        Matplotlib figure
+    """
+    fs = results['fs']
+    reference = results.get('reference', np.zeros(100))
+    desired = results['desired']
+    error = results['error']
+    scenario_order = results.get('scenario_order', [])
+    segment_boundaries = results.get('segment_boundaries', [])
+
+    # Time axis in seconds
+    n_samples = len(desired)
+    t = np.arange(n_samples) / fs
+
+    # Downsample for plotting if too many samples
+    max_plot_points = 5000
+    if n_samples > max_plot_points:
+        step = n_samples // max_plot_points
+        t_plot = t[::step]
+        reference_plot = reference[::step]
+        desired_plot = desired[::step]
+        error_plot = error[::step]
+    else:
+        t_plot = t
+        reference_plot = reference
+        desired_plot = desired
+        error_plot = error
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+
+    # Reference mic signal
+    axes[0].plot(t_plot, reference_plot, 'b-', linewidth=0.8, alpha=0.8)
+    axes[0].set_ylabel('Amplitude')
+    axes[0].set_title('Reference Mic Signal (Averaged)')
+    axes[0].grid(True, alpha=0.3)
+
+    # Desired signal (noise at error mic before ANC)
+    axes[1].plot(t_plot, desired_plot, 'r-', linewidth=0.8, alpha=0.8)
+    axes[1].set_ylabel('Amplitude')
+    axes[1].set_title('Error Mic: Before ANC (Noise at Driver Ear)')
+    axes[1].grid(True, alpha=0.3)
+
+    # Error signal (after ANC)
+    axes[2].plot(t_plot, error_plot, 'g-', linewidth=0.8, alpha=0.8)
+    axes[2].set_xlabel('Time (s)')
+    axes[2].set_ylabel('Amplitude')
+    axes[2].set_title(f'Error Mic: After ANC ({results["noise_reduction_db"]:.1f} dB reduction)')
+    axes[2].grid(True, alpha=0.3)
+
+    # Add vertical lines at scenario boundaries
+    colors = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6']
+    for i, boundary in enumerate(segment_boundaries):
+        t_boundary = boundary / fs
+        if i < len(scenario_order):
+            scenario_name = scenario_order[i].title()
+            color = colors[i % len(colors)]
+            for ax in axes:
+                ax.axvline(x=t_boundary, color=color, linestyle='--', alpha=0.7, linewidth=1.5)
+                # Add scenario label only on top plot
+                if ax == axes[0] and boundary > 0:
+                    ax.text(t_boundary + 0.05, ax.get_ylim()[1] * 0.85,
+                            scenario_name, fontsize=9, color=color, fontweight='bold')
+                elif ax == axes[0] and boundary == 0:
+                    ax.text(t_boundary + 0.05, ax.get_ylim()[1] * 0.85,
+                            scenario_name, fontsize=9, color=color, fontweight='bold')
+
+    plt.tight_layout()
+    return fig
+
+
+def plot_dynamic_ride_ref_mics(results: Dict[str, Any]) -> plt.Figure:
+    """
+    Plot individual reference mic signals for the entire dynamic ride simulation.
+    Shows all 4 ref mics with scenario transitions.
+
+    Args:
+        results: Simulation results dictionary
+
+    Returns:
+        Matplotlib figure
+    """
+    fs = results['fs']
+    ref_mic_signals = results.get('ref_mic_signals', {})
+    ref_mic_names = results.get('ref_mic_names', [])
+    scenario_order = results.get('scenario_order', [])
+    segment_boundaries = results.get('segment_boundaries', [])
+
+    if not ref_mic_signals:
+        # Fallback to single reference signal
+        ref_mic_signals = {'reference': results.get('reference', np.zeros(100))}
+        ref_mic_names = ['reference']
+
+    n_mics = len(ref_mic_names)
+    first_signal = ref_mic_signals[ref_mic_names[0]]
+    n_samples = len(first_signal)
+    t = np.arange(n_samples) / fs
+
+    # Downsample for plotting if too many samples
+    max_plot_points = 5000
+    if n_samples > max_plot_points:
+        step = n_samples // max_plot_points
+        t_plot = t[::step]
+    else:
+        step = 1
+        t_plot = t
+
+    fig, axes = plt.subplots(n_mics, 1, figsize=(12, 2.5 * n_mics), sharex=True)
+    if n_mics == 1:
+        axes = [axes]
+
+    colors = ['#e67e22', '#9b59b6', '#1abc9c', '#3498db']
+    scenario_colors = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6']
+
+    for i, name in enumerate(ref_mic_names):
+        signal = ref_mic_signals[name]
+        signal_plot = signal[::step] if step > 1 else signal
+        color = colors[i % len(colors)]
+        label = name.replace('_', ' ').title()
+
+        axes[i].plot(t_plot, signal_plot, color=color, linewidth=0.8, alpha=0.8)
+        axes[i].set_ylabel('Amplitude')
+        axes[i].set_title(f'{label}')
+        axes[i].grid(True, alpha=0.3)
+
+        # Add vertical lines at scenario boundaries
+        for j, boundary in enumerate(segment_boundaries):
+            t_boundary = boundary / fs
+            if j < len(scenario_order):
+                sc_color = scenario_colors[j % len(scenario_colors)]
+                axes[i].axvline(x=t_boundary, color=sc_color, linestyle='--', alpha=0.7, linewidth=1.5)
+                # Add scenario label only on first plot
+                if i == 0:
+                    scenario_name = scenario_order[j].title()
+                    axes[i].text(t_boundary + 0.05, axes[i].get_ylim()[1] * 0.85,
+                                scenario_name, fontsize=9, color=sc_color, fontweight='bold')
+
+    axes[-1].set_xlabel('Time (s)')
+
+    plt.suptitle('Individual Reference Mic Signals (Full Simulation)', fontsize=12, fontweight='bold')
+    plt.tight_layout()
+    return fig

@@ -1,7 +1,7 @@
 """
-FIR Filter Utilities
+Filter Utilities
 
-Basic FIR filter implementations for signal processing.
+FIR and IIR filter implementations for signal processing.
 """
 
 import numpy as np
@@ -77,3 +77,31 @@ class FIRFilter:
         frequencies = w * fs / (2 * np.pi)
         magnitude_db = 20 * np.log10(np.abs(h) + 1e-10)
         return frequencies, magnitude_db
+
+
+class BandpassPreFilter:
+    """
+    Sample-by-sample IIR bandpass filter using second-order sections.
+    SOS form is used for numerical stability at low normalized frequencies.
+    """
+
+    def __init__(self, low_freq: float, high_freq: float, sample_rate: float, order: int = 4):
+        from scipy.signal import butter
+        nyq = sample_rate / 2.0
+        low = max(low_freq / nyq, 0.001)
+        high = min(high_freq / nyq, 0.99)
+        self.sos = butter(order, [low, high], btype='band', output='sos')
+        self.state = np.zeros((self.sos.shape[0], 2))
+
+    def filter_sample(self, x: float) -> float:
+        for i in range(self.sos.shape[0]):
+            b0, b1, b2, _, a1, a2 = self.sos[i]
+            w = x - a1 * self.state[i, 0] - a2 * self.state[i, 1]
+            y = b0 * w + b1 * self.state[i, 0] + b2 * self.state[i, 1]
+            self.state[i, 1] = self.state[i, 0]
+            self.state[i, 0] = w
+            x = y
+        return y
+
+    def reset(self):
+        self.state = np.zeros((self.sos.shape[0], 2))

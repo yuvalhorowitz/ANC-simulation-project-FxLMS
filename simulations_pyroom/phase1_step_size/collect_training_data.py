@@ -4,6 +4,12 @@ Phase 1: Collect Training Data for Step Size Selector
 Runs FxNLMS simulations with different step sizes across various scenarios
 and records the results to train the step size selector model.
 
+Version 2: Updated for regression model with:
+- 4 scenarios (idle, city, highway, acceleration)
+- Realistic amplitude scaling
+- Multi-objective selection (NR + convergence time)
+- T90 convergence metric
+
 Output: output/data/phase1/step_size_training_data.json
 """
 
@@ -12,7 +18,7 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 # Add paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -22,24 +28,33 @@ import pyroomacoustics as pra
 from src.core.fxlms import FxNLMS
 from src.acoustic.path_generator import FIRPath
 from src.noise.noise_mixer import NoiseMixer
-from src.ml.phase1_step_size.feature_extractor import extract_features
-from src.ml.common.metrics import noise_reduction_db, convergence_time, stability_score
+from src.ml.phase1_step_size.feature_extractor import extract_features, N_FEATURES
+from src.ml.common.metrics import (
+    noise_reduction_db, convergence_time, stability_score,
+    convergence_time_90pct
+)
 
 
-def select_best_step_size(results: List[Dict]) -> float:
+def select_best_step_size_v2(
+    results: List[Dict],
+    nr_weight: float = 0.5,
+    conv_weight: float = 0.5
+) -> Tuple[float, float]:
     """
-    Select best μ using Pareto ranking that balances NR and convergence speed.
+    Select best μ using multi-objective optimization for NR and convergence.
 
-    Uses a weighted combination: 60% NR + 40% convergence speed.
-    This prevents bias toward extreme step sizes and encourages
-    learning scenario-specific patterns.
+    Balances noise reduction with convergence speed using T90 metric.
+    This prevents bias toward slow but high-NR step sizes and encourages
+    learning scenario-specific patterns that also converge quickly.
 
     Args:
         results: List of dicts with step_size, noise_reduction_db,
-                 convergence_time, stability_score
+                 convergence_time_90pct, stability_score
+        nr_weight: Weight for noise reduction (default 0.5)
+        conv_weight: Weight for convergence speed (default 0.5)
 
     Returns:
-        Best step size value
+        Tuple of (best_step_size, best_convergence_time_90pct)
     """
     # Filter for highly stable runs (stability > 0.8)
     stable = [r for r in results if r['stability_score'] > 0.8]
@@ -50,11 +65,11 @@ def select_best_step_size(results: List[Dict]) -> float:
 
     if not stable:
         # If still nothing stable, return conservative default
-        return 0.005
+        return 0.005, float('inf')
 
     # Normalize metrics to [0, 1] scale
     nr_vals = [r['noise_reduction_db'] for r in stable]
-    conv_vals = [r['convergence_time'] for r in stable]
+    conv_vals = [r['convergence_time_90pct'] for r in stable]
 
     nr_min, nr_max = min(nr_vals), max(nr_vals)
     conv_min, conv_max = min(conv_vals), max(conv_vals)
@@ -67,12 +82,22 @@ def select_best_step_size(results: List[Dict]) -> float:
     nr_norm = [(v - nr_min) / nr_range for v in nr_vals]
     conv_norm = [(conv_max - v) / conv_range for v in conv_vals]  # Invert: lower time = better
 
-    # Combined score: 60% NR + 40% convergence speed
-    scores = [0.6 * nr + 0.4 * conv for nr, conv in zip(nr_norm, conv_norm)]
+    # Combined score
+    scores = [nr_weight * nr + conv_weight * conv
+              for nr, conv in zip(nr_norm, conv_norm)]
 
     # Select step size with highest combined score
     best_idx = np.argmax(scores)
-    return stable[best_idx]['step_size']
+    best_result = stable[best_idx]
+
+    return best_result['step_size'], best_result['convergence_time_90pct']
+
+
+# Legacy function for backward compatibility
+def select_best_step_size(results: List[Dict]) -> float:
+    """Legacy: Select best μ (for backward compatibility)."""
+    best_mu, _ = select_best_step_size_v2(results)
+    return best_mu
 
 
 # =============================================================================
@@ -90,20 +115,38 @@ ROOM_MATERIALS = {
     'south': 0.30,
 }
 
-# Positions (matching step8)
-NOISE_SOURCE_POS = [0.3, 0.92, 0.4]
-REF_MIC_POS = [0.3, 0.92, 0.5]
-SPEAKER_POS = [1.9, 0.55, 1.0]
-ERROR_MIC_POS = [1.8, 0.55, 1.0]
+# Multi-channel configuration (matching playground presets.py)
+FOUR_SPEAKERS = {
+    'door_L': [2.0, 0.1, 0.4],       # Front left door
+    'door_R': [2.0, 1.75, 0.4],      # Front right door
+    'dash_L': [0.8, 0.25, 0.9],      # Dashboard left
+    'dash_R': [0.8, 1.60, 0.9],      # Dashboard right
+}
+
+FOUR_REF_MICS = {
+    'firewall': [0.3, 0.92, 0.5],    # Engine noise detection
+    'floor': [2.0, 0.55, 0.15],      # Road/tire noise
+    'a_pillar': [0.5, 0.15, 1.0],    # Wind noise
+    'dashboard': [0.9, 0.92, 0.8],   # General
+}
+
+ERROR_MIC_POS = [1.8, 0.55, 1.0]  # Driver's ear
+
+SCENARIO_NOISE_POSITIONS = {
+    'idle': [0.15, 0.92, 0.5],       # Engine (Firewall)
+    'city': [0.5, 0.92, 0.5],        # Combined (Dashboard)
+    'highway': [2.0, 0.92, 0.12],    # Road (Floor)
+    'acceleration': [0.15, 0.92, 0.5], # Engine (Firewall)
+}
 
 # Step sizes to test (5 values that occur as optimal in practice)
 STEP_SIZES = [0.003, 0.005, 0.007, 0.01, 0.015]
 
-# Scenarios to test
-SCENARIOS = ['idle', 'city', 'highway']
+# Scenarios to test (now includes acceleration)
+SCENARIOS = ['idle', 'city', 'highway', 'acceleration']
 
-# Number of variations per scenario
-N_VARIATIONS = 200  # 600 total samples (200 per scenario)
+# Number of variations per scenario (150 × 4 = 600 total samples)
+N_VARIATIONS = 150
 
 # Simulation parameters
 FS = 16000
@@ -111,12 +154,24 @@ DURATION = 3.0  # seconds
 FILTER_LENGTH = 256
 
 
-def create_room_simulation(fs: int = FS) -> Dict[str, np.ndarray]:
+def create_room_simulation_multi_channel(
+    scenario: str,
+    fs: int = FS
+) -> Dict[str, Any]:
     """
-    Create room and compute acoustic paths.
+    Create room with 4 speakers + 4 ref mics for given scenario.
+
+    Args:
+        scenario: Scenario name ('idle', 'city', 'highway', 'acceleration')
+        fs: Sample rate
 
     Returns:
-        Dictionary with primary, reference, and secondary path impulse responses
+        Dictionary with:
+        - primary: noise -> error mic
+        - reference_paths: dict of 4 RIRs (noise -> each ref mic)
+        - secondary: combined 4 speaker paths
+        - ref_mic_names: list of reference mic names
+        - speaker_names: list of speaker names
     """
     materials = {
         name: pra.Material(coef)
@@ -131,36 +186,58 @@ def create_room_simulation(fs: int = FS) -> Dict[str, np.ndarray]:
         air_absorption=True
     )
 
-    # Add noise source
-    room.add_source(NOISE_SOURCE_POS)
+    # Scenario-specific noise source
+    room.add_source(SCENARIO_NOISE_POSITIONS[scenario])
 
-    # Add speaker
-    room.add_source(SPEAKER_POS)
+    # Add all 4 speakers
+    speaker_names = list(FOUR_SPEAKERS.keys())
+    for name in speaker_names:
+        room.add_source(FOUR_SPEAKERS[name])
 
-    # Add microphones: [reference, error]
-    mic_array = np.array([REF_MIC_POS, ERROR_MIC_POS]).T
+    # Build mic array: 4 ref mics + 1 error mic
+    ref_mic_names = list(FOUR_REF_MICS.keys())
+    mic_positions = [FOUR_REF_MICS[name] for name in ref_mic_names]
+    mic_positions.append(ERROR_MIC_POS)
+    mic_array = np.array(mic_positions).T
     room.add_microphone_array(pra.MicrophoneArray(mic_array, fs=fs))
 
-    # Compute RIRs
     room.compute_rir()
-
     max_len = 512
 
+    error_mic_idx = len(ref_mic_names)  # Index 4
+
+    # Primary path
+    primary = room.rir[error_mic_idx][0][:max_len]
+
+    # Reference paths (will be averaged)
+    reference_paths = {
+        name: room.rir[i][0][:max_len]
+        for i, name in enumerate(ref_mic_names)
+    }
+
+    # Secondary paths (sum of all 4 speakers)
+    secondary_combined = np.zeros(max_len)
+    for i, name in enumerate(speaker_names):
+        rir = room.rir[error_mic_idx][i + 1][:max_len]
+        secondary_combined[:len(rir)] += rir
+
     return {
-        'primary': room.rir[1][0][:max_len],      # noise -> error mic
-        'reference': room.rir[0][0][:max_len],    # noise -> ref mic
-        'secondary': room.rir[1][1][:max_len],    # speaker -> error mic
+        'primary': primary,
+        'reference_paths': reference_paths,
+        'secondary': secondary_combined,
+        'speaker_names': speaker_names,
+        'ref_mic_names': ref_mic_names,
     }
 
 
 def run_simulation(
     noise_signal: np.ndarray,
-    paths: Dict[str, np.ndarray],
+    paths: Dict[str, Any],
     step_size: float,
     filter_length: int = FILTER_LENGTH
 ) -> Dict[str, Any]:
     """
-    Run a single ANC simulation with given step size.
+    Run a single ANC simulation with given step size (multi-channel).
 
     Returns:
         Dictionary with simulation results
@@ -169,18 +246,24 @@ def run_simulation(
 
     # Create path filters
     primary_path = FIRPath(paths['primary'])
-    reference_path = FIRPath(paths['reference'])
+
+    # Create FIR filter for each reference mic
+    reference_path_filters = {
+        name: FIRPath(paths['reference_paths'][name])
+        for name in paths['ref_mic_names']
+    }
+
     secondary_path = FIRPath(paths['secondary'])
 
     # Secondary path estimate with 5% error
     s_hat = paths['secondary'] * (1 + 0.05 * np.random.randn(len(paths['secondary'])))
 
-    # Create FxNLMS
+    # Create FxNLMS - CRITICAL: regularization changed to 1e-4 (matching playground)
     fxnlms = FxNLMS(
         filter_length=filter_length,
         step_size=step_size,
         secondary_path_estimate=s_hat,
-        regularization=1e-6
+        regularization=1e-4  # Changed from 1e-6
     )
 
     # Storage
@@ -191,8 +274,11 @@ def run_simulation(
     for i in range(n_samples):
         sample = noise_signal[i]
 
-        # Reference signal
-        x = reference_path.filter_sample(sample)
+        # AVERAGE 4 reference signals (signal fusion)
+        ref_signals = {}
+        for name in paths['ref_mic_names']:
+            ref_signals[name] = reference_path_filters[name].filter_sample(sample)
+        x = np.mean(list(ref_signals.values()))
 
         # Noise at error mic (primary path)
         d = primary_path.filter_sample(sample)
@@ -217,9 +303,18 @@ def run_simulation(
     conv_time = convergence_time(fxnlms.mse_history)
     stable = stability_score(fxnlms.mse_history)
 
+    # Compute T90 convergence time (time to reach 90% of final reduction)
+    conv_time_90 = convergence_time_90pct(
+        fxnlms.mse_history,
+        sample_rate=FS,
+        desired=desired,
+        error=error
+    )
+
     return {
         'noise_reduction_db': float(nr_db),
         'convergence_time': int(conv_time),
+        'convergence_time_90pct': float(conv_time_90),
         'stability_score': float(stable),
         'final_mse': float(fxnlms.mse_history[-1]) if fxnlms.mse_history else float('nan'),
         'desired': desired,
@@ -230,18 +325,18 @@ def run_simulation(
 
 def collect_data() -> List[Dict[str, Any]]:
     """
-    Collect training data across all scenarios and step sizes.
+    Collect training data across all scenarios and step sizes (multi-channel).
 
     Returns:
         List of data samples
     """
     print("=" * 70)
-    print("Phase 1: Collecting Training Data for Step Size Selector")
+    print("Phase 1: Multi-Channel Training Data Collection")
     print("=" * 70)
-
-    # Create room simulation
-    print("\nCreating room simulation...")
-    paths = create_room_simulation()
+    print(f"  4 speakers: {list(FOUR_SPEAKERS.keys())}")
+    print(f"  4 ref mics: {list(FOUR_REF_MICS.keys())} (averaged)")
+    print(f"  Scenario-specific noise positions")
+    print(f"  Regularization: 1e-4")
 
     # Initialize noise generator
     noise_gen = NoiseMixer(FS)
@@ -252,24 +347,40 @@ def collect_data() -> List[Dict[str, Any]]:
 
     for scenario in SCENARIOS:
         print(f"\n{'='*50}")
-        print(f"Scenario: {scenario}")
+        print(f"Scenario: {scenario} | Noise at: {SCENARIO_NOISE_POSITIONS[scenario]}")
         print(f"{'='*50}")
+
+        # Create scenario-specific room
+        paths = create_room_simulation_multi_channel(scenario)
 
         for variation in range(N_VARIATIONS):
             # Generate noise signal
             np.random.seed(42 + variation)
             noise_signal = noise_gen.generate_scenario(DURATION, scenario)
 
-            # CRITICAL FIX: Extract features from REFERENCE-FILTERED signal
+            # Extract features from AVERAGED reference signal
             # (matching what the model sees during deployment)
-            # Filter first second through reference path
-            reference_path = FIRPath(paths['reference'])
-            ref_signal = np.zeros(FS)
-            for i in range(min(FS, len(noise_signal))):
-                ref_signal[i] = reference_path.filter_sample(noise_signal[i])
+            ref_path_filters = {
+                name: FIRPath(paths['reference_paths'][name])
+                for name in paths['ref_mic_names']
+            }
 
-            # Extract features from reference-filtered signal
-            features = extract_features(ref_signal, FS)
+            # Collect first second from all 4 ref mics
+            ref_signals_1s = {name: [] for name in paths['ref_mic_names']}
+            for i in range(min(FS, len(noise_signal))):
+                sample = noise_signal[i]
+                for name in paths['ref_mic_names']:
+                    sig = ref_path_filters[name].filter_sample(sample)
+                    ref_signals_1s[name].append(sig)
+
+            # Average the 4 reference signals
+            ref_signal_averaged = np.mean([
+                np.array(ref_signals_1s[name])
+                for name in paths['ref_mic_names']
+            ], axis=0)
+
+            # Extract 12 features from averaged signal
+            features = extract_features(ref_signal_averaged, FS)
 
             # Test each step size
             results_for_scenario = []
@@ -286,11 +397,12 @@ def collect_data() -> List[Dict[str, Any]]:
                     'step_size': step_size,
                     'noise_reduction_db': result['noise_reduction_db'],
                     'convergence_time': result['convergence_time'],
+                    'convergence_time_90pct': result['convergence_time_90pct'],
                     'stability_score': result['stability_score'],
                 })
 
-            # Find best step size (max NR among stable runs)
-            best_step_size = select_best_step_size(results_for_scenario)
+            # Find best step size using multi-objective optimization (NR + convergence)
+            best_step_size, best_conv_time = select_best_step_size_v2(results_for_scenario)
 
             # Create training sample
             sample = {
@@ -298,6 +410,7 @@ def collect_data() -> List[Dict[str, Any]]:
                 'variation': variation,
                 'features': features.tolist(),
                 'best_step_size': best_step_size,
+                'best_convergence_time_90pct': best_conv_time,
                 'all_results': results_for_scenario,
             }
             all_data.append(sample)
@@ -312,6 +425,7 @@ def save_data(data: List[Dict], output_path: Path):
 
     output = {
         'timestamp': datetime.now().isoformat(),
+        'version': 3,  # v3: multi-channel with scenario-specific positions
         'config': {
             'step_sizes': STEP_SIZES,
             'scenarios': SCENARIOS,
@@ -319,6 +433,14 @@ def save_data(data: List[Dict], output_path: Path):
             'filter_length': FILTER_LENGTH,
             'duration': DURATION,
             'fs': FS,
+            'n_features': N_FEATURES,
+            'selection_method': 'multi_objective_nr_conv',
+            'num_speakers': 4,
+            'num_ref_mics': 4,
+            'regularization': 1e-4,
+            'speaker_positions': FOUR_SPEAKERS,
+            'ref_mic_positions': FOUR_REF_MICS,
+            'scenario_noise_positions': SCENARIO_NOISE_POSITIONS,
         },
         'samples': data,
     }
@@ -346,11 +468,16 @@ def main():
     for scenario in SCENARIOS:
         scenario_data = [d for d in data if d['scenario'] == scenario]
         best_sizes = [d['best_step_size'] for d in scenario_data]
+        conv_times = [d['best_convergence_time_90pct'] for d in scenario_data
+                      if d['best_convergence_time_90pct'] != float('inf')]
         print(f"\n{scenario}:")
         print(f"  Samples: {len(scenario_data)}")
         print(f"  Best μ distribution: {dict(zip(*np.unique(best_sizes, return_counts=True)))}")
+        if conv_times:
+            print(f"  Avg T90 convergence: {np.mean(conv_times):.2f}s")
 
     print(f"\nTotal samples: {len(data)}")
+    print(f"Features: {N_FEATURES}")
     print(f"Output: {output_path}")
 
 

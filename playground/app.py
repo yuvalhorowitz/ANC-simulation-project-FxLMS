@@ -20,9 +20,11 @@ from components.sidebar import render_sidebar, render_run_button
 from components.plots import (
     plot_before_after, plot_spectrum,
     plot_convergence, plot_convergence_db, plot_filter_coefficients,
+    plot_filter_coefficients_over_time,
     plot_ref_mic_signals_time, plot_ref_mic_signals_freq,
     plot_error_mic_time, plot_error_mic_freq,
-    plot_noise_source_time, plot_noise_source_freq
+    plot_noise_source_time, plot_noise_source_freq,
+    plot_dynamic_ride_signals, plot_dynamic_ride_ref_mics
 )
 from components.audio_player import render_audio_player
 from components.room_diagram import plot_room_diagram
@@ -195,8 +197,37 @@ def main():
             fig4 = plot_filter_coefficients(results)
             st.pyplot(fig4)
 
+            # Filter coefficients over time
+            if 'weights_history' in results and len(results['weights_history']) > 0:
+                st.subheader("Filter Coefficients Over Time")
+                fig_wh = plot_filter_coefficients_over_time(results)
+                st.pyplot(fig_wh)
+
         with tab2:
             st.subheader("Microphone Signal Analysis")
+
+            # Check if this is a dynamic ride simulation
+            is_dynamic_ride = results.get('scenario_order') is not None
+
+            # Dynamic ride: Show full simulation time plots first
+            if is_dynamic_ride:
+                st.markdown("### Full Simulation Timeline (Dynamic Ride)")
+                st.caption("Vertical lines indicate scenario transitions")
+
+                # Full simulation plot with all signals
+                fig_full = plot_dynamic_ride_signals(results)
+                st.pyplot(fig_full)
+
+                # Individual ref mic signals if in 4-ref mode
+                if 'ref_mic_signals' in results and len(results.get('ref_mic_names', [])) > 1:
+                    st.divider()
+                    st.markdown("### Individual Reference Mics (Full Timeline)")
+                    fig_ref_full = plot_dynamic_ride_ref_mics(results)
+                    st.pyplot(fig_ref_full)
+                    st.info(f"Showing {len(results['ref_mic_names'])} reference mics: {', '.join([n.replace('_', ' ').title() for n in results['ref_mic_names']])}")
+
+                st.divider()
+                st.markdown("### Detailed View (Last 100ms)")
 
             # Noise source signal (always shown)
             st.markdown("### Noise Source (Raw Signal)")
@@ -246,7 +277,8 @@ def main():
 
                 # Info about ref mics
                 st.info(f"Showing {len(results['ref_mic_names'])} reference mics: {', '.join([n.replace('_', ' ').title() for n in results['ref_mic_names']])}")
-            else:
+            elif not is_dynamic_ride:
+                # Only show this message for non-dynamic ride (dynamic ride shows full timeline plots)
                 st.info("Switch to **4-Reference Mic System** in the sidebar to see individual reference mic signals.")
 
         with tab3:

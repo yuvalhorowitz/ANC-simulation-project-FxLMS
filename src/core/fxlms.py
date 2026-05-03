@@ -213,7 +213,8 @@ class FxNLMS(FxLMS):
         filter_length: int,
         step_size: float,
         secondary_path_estimate: np.ndarray,
-        regularization: float = 1e-6
+        regularization: float = 1e-6,
+        leakage: float = 0.0
     ):
         """
         Initialize FxNLMS filter.
@@ -223,26 +224,21 @@ class FxNLMS(FxLMS):
             step_size: Normalized step size (0 < mu < 2 for stability)
             secondary_path_estimate: FIR coefficients of estimated S(z)
             regularization: Small constant to prevent division by zero
+            leakage: Weight decay factor (0 = standard NLMS)
         """
-        super().__init__(filter_length, step_size, secondary_path_estimate)
+        super().__init__(filter_length, step_size, secondary_path_estimate, leakage=leakage)
         self.delta = regularization
 
     def update_weights(self, e: float) -> None:
         """
-        Normalized weight update.
-
-        The step size is normalized by the signal power plus a
-        regularization term, providing more consistent adaptation
-        regardless of signal amplitude.
+        Normalized weight update with optional leakage.
 
         Args:
             e: Error signal sample
         """
-        # Compute normalization factor: ||xf(n)||^2 + delta
         norm_factor = self.delta + np.dot(self.xf_buffer, self.xf_buffer)
 
-        # Normalized weight update using filtered reference
-        self.weights = self.weights - (self.mu * e / norm_factor) * self.xf_buffer
+        self.weights = (1 - self.mu * self.leakage) * self.weights - \
+                       (self.mu * e / norm_factor) * self.xf_buffer
 
-        # Store MSE
         self.mse_history.append(e ** 2)

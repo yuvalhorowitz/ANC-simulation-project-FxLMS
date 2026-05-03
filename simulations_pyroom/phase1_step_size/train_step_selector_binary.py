@@ -1,18 +1,20 @@
 """
-Train Binary Step Size Selector (Low μ vs High μ)
+Train Binary Step Size Selector (IDLE vs Non-IDLE)
 
-Simplified training to test if the model can learn basic pattern.
+Simple binary classifier that detects IDLE scenario.
+- IDLE → μ=0.015 (aggressive, works well for quiet stable noise)
+- Non-IDLE → μ=0.005 (conservative baseline)
 
-Binary Classes:
-- Class 0 (Low μ): {0.003, 0.005, 0.007} - typical for CITY/HIGHWAY
-- Class 1 (High μ): {0.010, 0.015} - typical for IDLE
+This avoids misclassifying city/highway/acceleration.
 """
 
 import numpy as np
 import json
 import sys
+import torch
 from pathlib import Path
 from collections import Counter
+import matplotlib.pyplot as plt
 
 # Add path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -20,10 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.ml.phase1_step_size.step_size_selector_binary import (
     BinaryStepSizeSelector,
     BinaryStepSizeSelectorTrainer,
-    step_size_to_binary_class,
-    CLASS_LABELS
+    MU_IDLE,
+    MU_DEFAULT,
 )
-import torch
 
 
 def load_training_data(data_path: Path):
@@ -33,7 +34,6 @@ def load_training_data(data_path: Path):
 
     samples = data['samples']
 
-    # Extract features and targets
     features = np.array([s['features'] for s in samples], dtype=np.float32)
     targets = np.array([s['best_step_size'] for s in samples], dtype=np.float32)
     scenarios = [s['scenario'] for s in samples]
@@ -42,14 +42,22 @@ def load_training_data(data_path: Path):
 
 
 def split_data(features, targets, scenarios, train_ratio=0.8, seed=42):
-    """Split data into train/validation sets."""
+    """Split data into train/validation sets, stratified by scenario."""
     np.random.seed(seed)
-    n_samples = len(features)
-    indices = np.random.permutation(n_samples)
 
-    n_train = int(n_samples * train_ratio)
-    train_idx = indices[:n_train]
-    val_idx = indices[n_train:]
+    unique_scenarios = list(set(scenarios))
+    train_idx = []
+    val_idx = []
+
+    for scenario in unique_scenarios:
+        scenario_indices = [i for i, s in enumerate(scenarios) if s == scenario]
+        np.random.shuffle(scenario_indices)
+        n_train = int(len(scenario_indices) * train_ratio)
+        train_idx.extend(scenario_indices[:n_train])
+        val_idx.extend(scenario_indices[n_train:])
+
+    train_idx = np.array(train_idx)
+    val_idx = np.array(val_idx)
 
     return (
         features[train_idx], targets[train_idx], [scenarios[i] for i in train_idx],
@@ -57,107 +65,112 @@ def split_data(features, targets, scenarios, train_ratio=0.8, seed=42):
     )
 
 
-def compute_class_weights(targets: np.ndarray) -> torch.Tensor:
-    """
-    Compute class weights for handling imbalanced data.
+def plot_training_history(history: dict, output_path: Path):
+    """Plot and save training history."""
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-    Uses inverse frequency weighting.
-    """
-    # Convert to binary classes
-    binary_targets = np.array([step_size_to_binary_class(mu) for mu in targets])
+    epochs = range(1, len(history['train_loss']) + 1)
 
-    class_counts = Counter(binary_targets)
-    n_classes = 2
-    n_samples = len(binary_targets)
+    ax = axes[0]
+    ax.plot(epochs, history['train_loss'], 'b-', label='Train')
+    ax.plot(epochs, history['val_loss'], 'r-', label='Validation')
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    ax.set_title('Training Loss')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
 
-    # Compute weights: inversely proportional to frequency
-    weights = np.array([
-        n_samples / (n_classes * class_counts[i])
-        for i in range(n_classes)
-    ], dtype=np.float32)
+    ax = axes[1]
+    ax.plot(epochs, [a * 100 for a in history['train_acc']], 'b-', label='Train')
+    ax.plot(epochs, [a * 100 for a in history['val_acc']], 'r-', label='Validation')
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Accuracy (%)')
+    ax.set_title('Classification Accuracy')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
 
-    # Normalize to make minimum weight = 1.0
-    weights = weights / weights.min()
-
-    return torch.tensor(weights, dtype=torch.float32)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"Saved training plot to {output_path}")
+    plt.close()
 
 
 def main():
     print("=" * 70)
-    print("Training Binary Step Size Selector (Low μ vs High μ)")
+    print("Training Binary Step Size Selector (IDLE vs Non-IDLE)")
     print("=" * 70)
+    print(f"\nStrategy:")
+    print(f"  IDLE     → μ = {MU_IDLE} (aggressive)")
+    print(f"  Non-IDLE → μ = {MU_DEFAULT} (conservative baseline)")
 
     # Paths
     data_path = Path('output/data/phase1/step_size_training_data.json')
     model_path = Path('output/models/phase1/step_selector_binary.pt')
+    plot_dir = Path('output/plots/phase1')
+
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Load data
     print("\nLoading training data...")
     features, targets, scenarios = load_training_data(data_path)
-    print(f"Loaded {len(features)} samples with {features.shape[1]} features each")
+    print(f"Loaded {len(features)} samples with {features.shape[1]} features")
 
-    # Convert to binary classes for analysis
-    binary_targets = np.array([step_size_to_binary_class(mu) for mu in targets])
-
-    # Show binary class distribution
+    # Show scenario distribution
     print("\n" + "=" * 70)
-    print("BINARY CLASS DISTRIBUTION")
+    print("SCENARIO DISTRIBUTION")
     print("=" * 70)
 
-    class_counts = Counter(binary_targets)
-    for class_idx in [0, 1]:
-        count = class_counts[class_idx]
-        pct = 100.0 * count / len(binary_targets)
-        mu_values = [t for t, c in zip(targets, binary_targets) if c == class_idx]
-        unique_mu = sorted(set(mu_values))
-        print(f"\nClass {class_idx} ({CLASS_LABELS[class_idx]}):")
-        print(f"  Total samples: {count} ({pct:.1f}%)")
-        print(f"  Step sizes: {unique_mu}")
-        print(f"  Scenarios breakdown:")
-        for scenario in ['idle', 'city', 'highway']:
-            scenario_count = sum(1 for s, c in zip(scenarios, binary_targets)
-                               if s == scenario and c == class_idx)
-            print(f"    {scenario}: {scenario_count} samples")
+    scenario_counts = Counter(scenarios)
+    for scenario in ['idle', 'city', 'highway', 'acceleration']:
+        count = scenario_counts.get(scenario, 0)
+        label = "IDLE (→ μ=0.015)" if scenario == 'idle' else "Non-IDLE (→ μ=0.005)"
+        print(f"  {scenario:12s}: {count:3d} samples  [{label}]")
 
-    # Compute class weights
-    class_weights = compute_class_weights(targets)
-    print("\n" + "=" * 70)
-    print("CLASS WEIGHTS (for handling imbalance)")
-    print("=" * 70)
-    for i in range(2):
-        print(f"  {CLASS_LABELS[i]}: weight={class_weights[i]:.2f}")
+    # Binary class distribution
+    n_idle = scenario_counts.get('idle', 0)
+    n_non_idle = len(scenarios) - n_idle
+    print(f"\nBinary split: {n_idle} IDLE vs {n_non_idle} Non-IDLE")
+
+    # Class weights (handle imbalance: 1 IDLE vs 3 Non-IDLE scenarios)
+    class_weights = torch.tensor([
+        1.0,                          # Non-IDLE weight
+        n_non_idle / (n_idle + 1e-6)  # IDLE weight (upweight minority class)
+    ], dtype=torch.float32)
+    print(f"Class weights: [Non-IDLE: {class_weights[0]:.2f}, IDLE: {class_weights[1]:.2f}]")
 
     # Split data
-    print("\nSplitting data (80/20 train/val)...")
-    train_features, train_targets, train_scenarios, \
-        val_features, val_targets, val_scenarios = split_data(features, targets, scenarios)
+    print("\nSplitting data (80/20 train/val, stratified)...")
+    (train_features, train_targets, train_scenarios,
+     val_features, val_targets, val_scenarios) = split_data(features, targets, scenarios)
 
     print(f"Training set: {len(train_features)} samples")
     print(f"Validation set: {len(val_features)} samples")
 
+    # Verify stratification
+    train_idle = sum(1 for s in train_scenarios if s == 'idle')
+    val_idle = sum(1 for s in val_scenarios if s == 'idle')
+    print(f"  Train IDLE: {train_idle}, Val IDLE: {val_idle}")
+
     # Create model
     print("\n" + "=" * 70)
-    print("MODEL ARCHITECTURE")
+    print("MODEL")
     print("=" * 70)
 
     model = BinaryStepSizeSelector(
-        input_dim=12,
-        hidden_dim=64,  # Increased from 32
-        dropout=0.3
+        input_dim=features.shape[1],
+        hidden_dim=32,
+        dropout=0.2
     )
 
-    # Count parameters
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Model: BinaryStepSizeSelector")
-    print(f"Input features: 12")
-    print(f"Hidden dimension: 32")
-    print(f"Output classes: 2 (binary)")
-    print(f"Total parameters: {n_params:,}")
+    print(f"Architecture: {features.shape[1]} → 32 → 16 → 2")
+    print(f"Parameters: {n_params:,}")
 
-    # Create trainer with class weights
+    # Create trainer
     trainer = BinaryStepSizeSelectorTrainer(
         model,
-        learning_rate=0.0005,  # Reduced from 0.001
+        learning_rate=0.001,
         weight_decay=1e-4,
         class_weights=class_weights
     )
@@ -169,12 +182,12 @@ def main():
 
     history = trainer.train(
         train_features=train_features,
-        train_targets=train_targets,
+        train_scenarios=train_scenarios,
         val_features=val_features,
-        val_targets=val_targets,
-        epochs=200,  # Increased from 150
+        val_scenarios=val_scenarios,
+        epochs=150,
         batch_size=32,
-        early_stopping_patience=30,  # Increased patience
+        early_stopping_patience=20,
         verbose=True
     )
 
@@ -182,78 +195,84 @@ def main():
     model.save(model_path)
     print(f"\nModel saved to: {model_path}")
 
+    # Plot training history
+    plot_training_history(history, plot_dir / 'training_history_binary.png')
+
     # Final evaluation
     print("\n" + "=" * 70)
-    print("FINAL EVALUATION")
+    print("EVALUATION")
     print("=" * 70)
 
-    # Training set accuracy
-    train_binary_targets = np.array([step_size_to_binary_class(mu) for mu in train_targets])
-    train_predictions = model.predict(train_features)
-    train_correct = np.sum(train_predictions == train_binary_targets)
-    train_accuracy = train_correct / len(train_features)
-
-    # Validation set accuracy
-    val_binary_targets = np.array([step_size_to_binary_class(mu) for mu in val_targets])
-    val_predictions = model.predict(val_features)
-    val_correct = np.sum(val_predictions == val_binary_targets)
+    # Validation accuracy
+    val_predictions = model.predict_class(val_features)
+    val_targets_binary = np.array([1 if s == 'idle' else 0 for s in val_scenarios])
+    val_correct = np.sum(val_predictions == val_targets_binary)
     val_accuracy = val_correct / len(val_features)
 
-    print(f"Training Accuracy: {train_accuracy:.3f} ({train_correct}/{len(train_features)})")
-    print(f"Validation Accuracy: {val_accuracy:.3f} ({val_correct}/{len(val_features)})")
+    print(f"\nValidation Accuracy: {val_accuracy:.1%} ({val_correct}/{len(val_features)})")
 
-    # Per-scenario breakdown
-    print("\nPer-scenario accuracy:")
-    for scenario in ['idle', 'city', 'highway']:
-        # Validation set
-        scenario_mask = np.array([s == scenario for s in val_scenarios])
-        if scenario_mask.sum() > 0:
-            scenario_acc = np.mean(
-                val_predictions[scenario_mask] == val_binary_targets[scenario_mask]
-            )
-            n_scenario = scenario_mask.sum()
-            print(f"  {scenario:8s}: {scenario_acc:.3f} ({n_scenario} samples)")
+    # Per-scenario accuracy
+    print("\nPer-Scenario Accuracy:")
+    for scenario in ['idle', 'city', 'highway', 'acceleration']:
+        mask = np.array([s == scenario for s in val_scenarios])
+        if mask.sum() > 0:
+            scenario_preds = val_predictions[mask]
+            expected = 1 if scenario == 'idle' else 0
+            correct = np.sum(scenario_preds == expected)
+            acc = correct / mask.sum()
+            status = "✓" if acc > 0.8 else "✗"
+            print(f"  {scenario:12s}: {acc:5.1%} ({correct}/{mask.sum()}) {status}")
 
     # Confusion matrix
-    print("\nConfusion Matrix (Validation Set):")
-    print("                 Predicted")
-    print("                 Low    High")
-    print("Actual Low     ", end="")
-    low_to_low = np.sum((val_binary_targets == 0) & (val_predictions == 0))
-    low_to_high = np.sum((val_binary_targets == 0) & (val_predictions == 1))
-    print(f"{low_to_low:4d}   {low_to_high:4d}")
+    print("\nConfusion Matrix:")
+    print("                  Predicted")
+    print("               Non-IDLE  IDLE")
+    tp = np.sum((val_targets_binary == 1) & (val_predictions == 1))
+    tn = np.sum((val_targets_binary == 0) & (val_predictions == 0))
+    fp = np.sum((val_targets_binary == 0) & (val_predictions == 1))
+    fn = np.sum((val_targets_binary == 1) & (val_predictions == 0))
+    print(f"Actual Non-IDLE   {tn:4d}     {fp:4d}")
+    print(f"Actual IDLE       {fn:4d}     {tp:4d}")
 
-    print("Actual High    ", end="")
-    high_to_low = np.sum((val_binary_targets == 1) & (val_predictions == 0))
-    high_to_high = np.sum((val_binary_targets == 1) & (val_predictions == 1))
-    print(f"{high_to_low:4d}   {high_to_high:4d}")
+    # Precision/Recall for IDLE class
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
-    # Success criteria
+    print(f"\nIDLE Detection Metrics:")
+    print(f"  Precision: {precision:.1%} (of predicted IDLE, how many are correct)")
+    print(f"  Recall:    {recall:.1%} (of actual IDLE, how many detected)")
+    print(f"  F1 Score:  {f1:.1%}")
+
+    # Expected NR improvement calculation
     print("\n" + "=" * 70)
-    print("SUCCESS CRITERIA")
+    print("EXPECTED NR IMPROVEMENT")
     print("=" * 70)
 
-    target_accuracy = 0.70  # 70% target for binary classification
-    passed = val_accuracy >= target_accuracy
+    # From the 5-class evaluation, IDLE gained +1.47 dB
+    idle_gain = 1.47
+    # With binary model:
+    # - If we correctly detect IDLE (recall), we get the gain
+    # - If we incorrectly predict IDLE for non-IDLE (false positive), we might lose
+    # Assuming non-IDLE with μ=0.015 loses ~0.5 dB on average
 
-    print(f"Target validation accuracy: {target_accuracy:.1%}")
-    print(f"Achieved validation accuracy: {val_accuracy:.1%}")
-    print(f"Status: {'✓ PASSED' if passed else '✗ FAILED'}")
+    expected_idle_contribution = recall * idle_gain * (n_idle / len(scenarios))
+    false_positive_loss = (fp / n_non_idle) * 0.5 * (n_non_idle / len(scenarios))
+    expected_mean_improvement = expected_idle_contribution - false_positive_loss
 
-    if passed:
-        print("\nBinary classifier successfully learned to distinguish Low μ vs High μ!")
-        print("This proves:")
-        print("  1. Features ARE discriminative")
-        print("  2. Model CAN learn from data")
-        print("  3. Problem complexity was the issue (5 classes too many)")
-        print("\nNext step: Gradually expand to 3, then 4, then 5 classes")
+    print(f"IDLE gain (from 5-class eval): +{idle_gain:.2f} dB")
+    print(f"IDLE recall: {recall:.1%}")
+    print(f"False positive rate: {fp}/{n_non_idle} = {100*fp/n_non_idle:.1f}%")
+    print(f"Expected mean improvement: ~{expected_mean_improvement:+.2f} dB")
+
+    print("\n" + "=" * 70)
+    if val_accuracy >= 0.90:
+        print("SUCCESS: High accuracy binary classifier ready!")
+        print("Run evaluate_step_selector_binary.py to verify NR improvement.")
     else:
-        print("\nBinary classifier failed to learn even this simple pattern.")
-        print("This indicates:")
-        print("  1. Features may not capture scenario differences")
-        print("  2. Model architecture may need improvement")
-        print("  3. Data quality issues")
-        print("\nRecommend: Analyze features to see if they correlate with scenarios")
+        print(f"Binary classifier accuracy: {val_accuracy:.1%}")
+        print("May need feature engineering or more training data.")
+    print("=" * 70)
 
 
 if __name__ == '__main__':

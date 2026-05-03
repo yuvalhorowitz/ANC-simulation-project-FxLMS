@@ -20,6 +20,41 @@ from src.noise.noise_mixer import NoiseMixer
 from src.ml.common.metrics import convergence_time_90pct
 
 
+def _generate_noise(noise_gen, params):
+    """
+    Generate or load noise signal based on params.
+    Returns (noise_source, scenario_order).
+    For real audio: scenario_order is None.
+    For dynamic ride: scenario_order is the list of scenario names.
+    """
+    audio_file = params.get('audio_file')
+    if audio_file:
+        noise_source = noise_gen.load_audio_file(audio_file, duration=params['duration'])
+        return noise_source, None
+
+    scenario = params.get('scenario', 'highway')
+    if scenario == 'dynamic ride':
+        noise_source, scenario_order = noise_gen.generate_dynamic_scenario(params['duration'])
+        return noise_source, scenario_order
+    else:
+        noise_source = noise_gen.generate_scenario(params['duration'], scenario)
+        return noise_source, None
+
+
+WEIGHT_SNAPSHOT_INTERVAL_S = 0.5
+
+
+def _create_fxlms(params, secondary_path_estimate, sample_rate):
+    """Create FxNLMS adaptive filter from params."""
+    return FxNLMS(
+        filter_length=params['filter_length'],
+        step_size=params['step_size'],
+        secondary_path_estimate=secondary_path_estimate,
+        regularization=1e-4,
+        leakage=params.get('leakage', 0.0)
+    )
+
+
 class PlaygroundSimulation:
     """
     Simplified ANC simulation for the Playground GUI.
@@ -59,12 +94,7 @@ class PlaygroundSimulation:
         self.reference_path = FIRPath(self.H_reference)
 
         # Create FxNLMS
-        self.fxlms = FxNLMS(
-            filter_length=params['filter_length'],
-            step_size=params['step_size'],
-            secondary_path_estimate=self.H_secondary_est,
-            regularization=1e-4
-        )
+        self.fxlms = _create_fxlms(params, self.H_secondary_est, self.fs)
 
         # Noise generator
         self.noise_gen = NoiseMixer(self.fs)
@@ -119,16 +149,9 @@ class PlaygroundSimulation:
         Returns:
             Results dictionary with all signals and metrics
         """
-        duration = self.params['duration']
-        scenario = self.params.get('scenario', 'highway')
-
-        # Generate noise (handle dynamic ride separately)
-        if scenario == 'dynamic ride':
-            noise_source, scenario_order = self.noise_gen.generate_dynamic_scenario(duration)
-        else:
-            noise_source = self.noise_gen.generate_scenario(duration, scenario)
-            scenario_order = None
+        noise_source, scenario_order = _generate_noise(self.noise_gen, self.params)
         n_samples = len(noise_source)
+        duration = n_samples / self.fs
 
         # Reset filters
         self.fxlms.reset()
@@ -142,6 +165,8 @@ class PlaygroundSimulation:
         antinoise = []
         error = []
         mse = []
+        weights_history = []
+        snapshot_interval = int(WEIGHT_SNAPSHOT_INTERVAL_S * self.fs)
 
         # Process samples
         for i in range(n_samples):
@@ -171,6 +196,9 @@ class PlaygroundSimulation:
             self.fxlms.filter_reference(x)
             self.fxlms.update_weights(e)
 
+            if (i + 1) % snapshot_interval == 0:
+                weights_history.append(self.fxlms.weights.copy())
+
             # Progress callback
             if progress_callback and (i + 1) % (n_samples // 20) == 0:
                 progress = (i + 1) / n_samples
@@ -197,7 +225,7 @@ class PlaygroundSimulation:
         )
 
         self.results = {
-            'noise_source': noise_source,  # Raw noise signal
+            'noise_source': noise_source,
             'reference': np.array(reference),
             'desired': desired_arr,
             'antinoise': np.array(antinoise),
@@ -206,10 +234,11 @@ class PlaygroundSimulation:
             'noise_reduction_db': noise_reduction_db,
             'convergence_time': conv_time,
             'weights': self.fxlms.weights.copy(),
+            'weights_history': np.array(weights_history),
             'duration': duration,
             'fs': self.fs,
             'params': self.params,
-            'scenario_order': scenario_order,  # For dynamic ride
+            'scenario_order': scenario_order,
         }
 
         return self.results
@@ -273,12 +302,7 @@ class MultiRefMicSimulation:
         }
 
         # Create FxNLMS
-        self.fxlms = FxNLMS(
-            filter_length=params['filter_length'],
-            step_size=params['step_size'],
-            secondary_path_estimate=self.H_secondary_est,
-            regularization=1e-4
-        )
+        self.fxlms = _create_fxlms(params, self.H_secondary_est, self.fs)
 
         # Noise generator
         self.noise_gen = NoiseMixer(self.fs)
@@ -325,16 +349,9 @@ class MultiRefMicSimulation:
 
     def run(self, progress_callback=None) -> dict:
         """Run multi-reference-mic ANC simulation."""
-        duration = self.params['duration']
-        scenario = self.params.get('scenario', 'highway')
-
-        # Generate noise (handle dynamic ride separately)
-        if scenario == 'dynamic ride':
-            noise_source, scenario_order = self.noise_gen.generate_dynamic_scenario(duration)
-        else:
-            noise_source = self.noise_gen.generate_scenario(duration, scenario)
-            scenario_order = None
+        noise_source, scenario_order = _generate_noise(self.noise_gen, self.params)
         n_samples = len(noise_source)
+        duration = n_samples / self.fs
 
         # Reset filters
         self.fxlms.reset()
@@ -349,6 +366,8 @@ class MultiRefMicSimulation:
         antinoise = []
         error = []
         mse = []
+        weights_history = []
+        snapshot_interval = int(WEIGHT_SNAPSHOT_INTERVAL_S * self.fs)
 
         # Storage for individual reference mic signals
         ref_mic_signals = {name: [] for name in self.ref_mic_names}
@@ -386,6 +405,9 @@ class MultiRefMicSimulation:
             self.fxlms.filter_reference(x)
             self.fxlms.update_weights(e)
 
+            if (i + 1) % snapshot_interval == 0:
+                weights_history.append(self.fxlms.weights.copy())
+
             # Progress callback
             if progress_callback and (i + 1) % (n_samples // 20) == 0:
                 progress = (i + 1) / n_samples
@@ -415,7 +437,7 @@ class MultiRefMicSimulation:
         ref_mic_signals_arr = {name: np.array(sig) for name, sig in ref_mic_signals.items()}
 
         self.results = {
-            'noise_source': noise_source,  # Raw noise signal
+            'noise_source': noise_source,
             'reference': np.array(reference),
             'desired': desired_arr,
             'antinoise': np.array(antinoise),
@@ -424,13 +446,14 @@ class MultiRefMicSimulation:
             'noise_reduction_db': noise_reduction_db,
             'convergence_time': conv_time,
             'weights': self.fxlms.weights.copy(),
+            'weights_history': np.array(weights_history),
             'duration': duration,
             'fs': self.fs,
             'params': self.params,
             'num_ref_mics': len(self.ref_mics),
             'ref_mic_names': list(self.ref_mics.keys()),
-            'ref_mic_signals': ref_mic_signals_arr,  # Individual ref mic signals
-            'scenario_order': scenario_order,  # For dynamic ride
+            'ref_mic_signals': ref_mic_signals_arr,
+            'scenario_order': scenario_order,
         }
 
         return self.results
@@ -507,12 +530,7 @@ class MultiRefMicMultiSpeakerSimulation:
         }
 
         # Create FxNLMS with combined secondary path
-        self.fxlms = FxNLMS(
-            filter_length=params['filter_length'],
-            step_size=params['step_size'],
-            secondary_path_estimate=self.H_secondary_est,
-            regularization=1e-4
-        )
+        self.fxlms = _create_fxlms(params, self.H_secondary_est, self.fs)
 
         # Noise generator
         self.noise_gen = NoiseMixer(self.fs)
@@ -560,16 +578,9 @@ class MultiRefMicMultiSpeakerSimulation:
 
     def run(self, progress_callback=None) -> dict:
         """Run combined multi-ref-mic + multi-speaker ANC simulation."""
-        duration = self.params['duration']
-        scenario = self.params.get('scenario', 'highway')
-
-        # Generate noise (handle dynamic ride separately)
-        if scenario == 'dynamic ride':
-            noise_source, scenario_order = self.noise_gen.generate_dynamic_scenario(duration)
-        else:
-            noise_source = self.noise_gen.generate_scenario(duration, scenario)
-            scenario_order = None
+        noise_source, scenario_order = _generate_noise(self.noise_gen, self.params)
         n_samples = len(noise_source)
+        duration = n_samples / self.fs
 
         # Reset filters
         self.fxlms.reset()
@@ -585,6 +596,8 @@ class MultiRefMicMultiSpeakerSimulation:
         antinoise = []
         error = []
         mse = []
+        weights_history = []
+        snapshot_interval = int(WEIGHT_SNAPSHOT_INTERVAL_S * self.fs)
 
         # Storage for individual reference mic signals
         ref_mic_signals = {name: [] for name in self.ref_mic_names}
@@ -624,6 +637,9 @@ class MultiRefMicMultiSpeakerSimulation:
             self.fxlms.filter_reference(x)
             self.fxlms.update_weights(e)
 
+            if (i + 1) % snapshot_interval == 0:
+                weights_history.append(self.fxlms.weights.copy())
+
             # Progress callback
             if progress_callback and (i + 1) % (n_samples // 20) == 0:
                 progress = (i + 1) / n_samples
@@ -653,7 +669,7 @@ class MultiRefMicMultiSpeakerSimulation:
         ref_mic_signals_arr = {name: np.array(sig) for name, sig in ref_mic_signals.items()}
 
         self.results = {
-            'noise_source': noise_source,  # Raw noise signal
+            'noise_source': noise_source,
             'reference': np.array(reference),
             'desired': desired_arr,
             'antinoise': np.array(antinoise),
@@ -662,6 +678,7 @@ class MultiRefMicMultiSpeakerSimulation:
             'noise_reduction_db': noise_reduction_db,
             'convergence_time': conv_time,
             'weights': self.fxlms.weights.copy(),
+            'weights_history': np.array(weights_history),
             'duration': duration,
             'fs': self.fs,
             'params': self.params,
@@ -669,8 +686,8 @@ class MultiRefMicMultiSpeakerSimulation:
             'ref_mic_names': list(self.ref_mics.keys()),
             'num_speakers': len(self.speakers),
             'speaker_names': list(self.speakers.keys()),
-            'ref_mic_signals': ref_mic_signals_arr,  # Individual ref mic signals
-            'scenario_order': scenario_order,  # For dynamic ride
+            'ref_mic_signals': ref_mic_signals_arr,
+            'scenario_order': scenario_order,
         }
 
         return self.results
@@ -739,12 +756,7 @@ class MultiSpeakerSimulation:
         }
 
         # Create FxNLMS with combined secondary path
-        self.fxlms = FxNLMS(
-            filter_length=params['filter_length'],
-            step_size=params['step_size'],
-            secondary_path_estimate=self.H_secondary_est,
-            regularization=1e-4
-        )
+        self.fxlms = _create_fxlms(params, self.H_secondary_est, self.fs)
 
         # Noise generator
         self.noise_gen = NoiseMixer(self.fs)
@@ -793,16 +805,9 @@ class MultiSpeakerSimulation:
 
     def run(self, progress_callback=None) -> dict:
         """Run multi-speaker ANC simulation."""
-        duration = self.params['duration']
-        scenario = self.params.get('scenario', 'highway')
-
-        # Generate noise (handle dynamic ride separately)
-        if scenario == 'dynamic ride':
-            noise_source, scenario_order = self.noise_gen.generate_dynamic_scenario(duration)
-        else:
-            noise_source = self.noise_gen.generate_scenario(duration, scenario)
-            scenario_order = None
+        noise_source, scenario_order = _generate_noise(self.noise_gen, self.params)
         n_samples = len(noise_source)
+        duration = n_samples / self.fs
 
         # Reset filters
         self.fxlms.reset()
@@ -817,6 +822,8 @@ class MultiSpeakerSimulation:
         antinoise = []
         error = []
         mse = []
+        weights_history = []
+        snapshot_interval = int(WEIGHT_SNAPSHOT_INTERVAL_S * self.fs)
 
         for i in range(n_samples):
             sample = noise_source[i]
@@ -847,6 +854,9 @@ class MultiSpeakerSimulation:
             self.fxlms.filter_reference(x)
             self.fxlms.update_weights(e)
 
+            if (i + 1) % snapshot_interval == 0:
+                weights_history.append(self.fxlms.weights.copy())
+
             # Progress callback
             if progress_callback and (i + 1) % (n_samples // 20) == 0:
                 progress = (i + 1) / n_samples
@@ -873,7 +883,7 @@ class MultiSpeakerSimulation:
         )
 
         self.results = {
-            'noise_source': noise_source,  # Raw noise signal
+            'noise_source': noise_source,
             'reference': np.array(reference),
             'desired': desired_arr,
             'antinoise': np.array(antinoise),
@@ -882,12 +892,523 @@ class MultiSpeakerSimulation:
             'noise_reduction_db': noise_reduction_db,
             'convergence_time': conv_time,
             'weights': self.fxlms.weights.copy(),
+            'weights_history': np.array(weights_history),
             'duration': duration,
             'fs': self.fs,
             'params': self.params,
             'num_speakers': len(self.speakers),
             'speaker_names': list(self.speakers.keys()),
-            'scenario_order': scenario_order,  # For dynamic ride
+            'scenario_order': scenario_order,
+        }
+
+        return self.results
+
+
+# Scenario to noise source position mapping (matching presets.py)
+SCENARIO_NOISE_POSITIONS = {
+    'idle': [0.15, 0.92, 0.5],        # Engine (Firewall)
+    'city': [0.5, 0.92, 0.5],         # Combined (Dashboard)
+    'highway': [2.0, 0.92, 0.12],     # Road (Floor)
+    'acceleration': [0.15, 0.92, 0.5], # Engine (Firewall)
+}
+
+
+class DynamicRideSimulation:
+    """
+    Dynamic Ride simulation with multiple noise source positions.
+
+    Pre-computes RIRs for all 4 noise positions and switches between them
+    as the scenario changes, with crossfade transitions.
+    """
+
+    def __init__(self, params: dict):
+        """
+        Initialize dynamic ride simulation.
+
+        Args:
+            params: Dictionary containing all simulation parameters
+        """
+        self.params = params
+        self.fs = params.get('sample_rate', 16000)
+        self.crossfade_ms = 100.0  # Crossfade duration in ms
+
+        # Build room with all noise source positions
+        self.room = self._create_room()
+
+        # Compute RIRs
+        self.room.compute_rir()
+
+        # Extract acoustic paths for each noise source position
+        max_len = 512
+        positions = params['positions']
+
+        # Source indices: 0=idle/engine, 1=city/combined, 2=highway/road, 3=acceleration/engine, 4=speaker
+        # Note: idle and acceleration share the same position (engine/firewall)
+        self.scenario_source_idx = {
+            'idle': 0,
+            'city': 1,
+            'highway': 2,
+            'acceleration': 3,
+        }
+
+        # Primary paths: each noise source -> error mic (mic index 1)
+        self.H_primary = {}
+        for scenario, src_idx in self.scenario_source_idx.items():
+            self.H_primary[scenario] = self.room.rir[1][src_idx][:max_len]
+
+        # Reference paths: each noise source -> reference mic (mic index 0)
+        self.H_reference = {}
+        for scenario, src_idx in self.scenario_source_idx.items():
+            self.H_reference[scenario] = self.room.rir[0][src_idx][:max_len]
+
+        # Secondary path: speaker -> error mic (speaker is source 4)
+        self.H_secondary = self.room.rir[1][4][:max_len]
+
+        # Estimate with 5% error
+        self.H_secondary_est = self.H_secondary * (
+            1 + 0.05 * np.random.randn(len(self.H_secondary))
+        )
+
+        # Create FIR filters for each scenario
+        self.primary_paths = {
+            scenario: FIRPath(self.H_primary[scenario])
+            for scenario in self.scenario_source_idx.keys()
+        }
+        self.reference_paths = {
+            scenario: FIRPath(self.H_reference[scenario])
+            for scenario in self.scenario_source_idx.keys()
+        }
+        self.secondary_path = FIRPath(self.H_secondary)
+
+        # Create FxNLMS
+        self.fxlms = _create_fxlms(params, self.H_secondary_est, self.fs)
+
+        # Noise generator
+        self.noise_gen = NoiseMixer(self.fs)
+
+        self.results = {}
+
+    def _create_room(self) -> pra.ShoeBox:
+        """Create room with all noise source positions."""
+        dims = self.params['dimensions']
+        absorption = self.params['absorption']
+        max_order = self.params['max_order']
+        positions = self.params['positions']
+
+        materials = {
+            'ceiling': pra.Material(absorption * 1.1),
+            'floor': pra.Material(absorption * 1.5),
+            'east': pra.Material(absorption * 0.5),
+            'west': pra.Material(absorption * 0.5),
+            'north': pra.Material(absorption * 0.7),
+            'south': pra.Material(absorption * 0.9),
+        }
+
+        room = pra.ShoeBox(
+            dims,
+            fs=self.fs,
+            materials=materials,
+            max_order=max_order,
+            air_absorption=True
+        )
+
+        # Add all noise source positions as separate sources
+        # Source 0: Idle (Engine/Firewall)
+        room.add_source(SCENARIO_NOISE_POSITIONS['idle'])
+        # Source 1: City (Combined/Dashboard)
+        room.add_source(SCENARIO_NOISE_POSITIONS['city'])
+        # Source 2: Highway (Road/Floor)
+        room.add_source(SCENARIO_NOISE_POSITIONS['highway'])
+        # Source 3: Acceleration (Engine/Firewall - same as idle)
+        room.add_source(SCENARIO_NOISE_POSITIONS['acceleration'])
+        # Source 4: Speaker
+        room.add_source(positions['speaker'])
+
+        # Add microphones: [0] = reference, [1] = error
+        mic_array = np.array([
+            positions['reference_mic'],
+            positions['error_mic']
+        ]).T
+        room.add_microphone_array(pra.MicrophoneArray(mic_array, fs=self.fs))
+
+        return room
+
+    def run(self, progress_callback=None) -> dict:
+        """Run dynamic ride simulation with position switching."""
+        duration = self.params['duration']
+        crossfade_samples = int(self.crossfade_ms / 1000.0 * self.fs)
+
+        # Generate dynamic noise with crossfade
+        noise_source, scenario_order, segment_boundaries = \
+            self.noise_gen.generate_dynamic_scenario(duration, crossfade_ms=self.crossfade_ms)
+        n_samples = len(noise_source)
+
+        # Calculate segment length (accounting for crossfade reduction)
+        segment_len = n_samples // len(scenario_order)
+
+        # Reset filters
+        self.fxlms.reset()
+        self.secondary_path.reset()
+        for path in self.primary_paths.values():
+            path.reset()
+        for path in self.reference_paths.values():
+            path.reset()
+
+        # Storage
+        reference = []
+        desired = []
+        antinoise = []
+        error = []
+        mse = []
+        weights_history = []
+        snapshot_interval = int(WEIGHT_SNAPSHOT_INTERVAL_S * self.fs)
+
+        # Track current and next scenario for crossfade
+        def get_scenario_at_sample(sample_idx):
+            """Get the scenario name for a given sample index."""
+            for i, boundary in enumerate(segment_boundaries):
+                if i == len(segment_boundaries) - 1:
+                    return scenario_order[i]
+                if sample_idx < segment_boundaries[i + 1]:
+                    return scenario_order[i]
+            return scenario_order[-1]
+
+        def get_crossfade_weight(sample_idx):
+            """Get crossfade weight (0-1) if in transition zone, else None."""
+            for i in range(1, len(segment_boundaries)):
+                boundary = segment_boundaries[i]
+                adjusted_boundary = boundary - (i * crossfade_samples)
+                if adjusted_boundary - crossfade_samples <= sample_idx < adjusted_boundary:
+                    progress = (sample_idx - (adjusted_boundary - crossfade_samples)) / crossfade_samples
+                    return progress, scenario_order[i-1], scenario_order[i]
+            return None
+
+        # Process samples
+        for i in range(n_samples):
+            sample = noise_source[i]
+
+            crossfade_info = get_crossfade_weight(i)
+
+            if crossfade_info is not None:
+                weight, from_scenario, to_scenario = crossfade_info
+                x_from = self.reference_paths[from_scenario].filter_sample(sample)
+                x_to = self.reference_paths[to_scenario].filter_sample(sample)
+                x = (1 - weight) * x_from + weight * x_to
+                d_from = self.primary_paths[from_scenario].filter_sample(sample)
+                d_to = self.primary_paths[to_scenario].filter_sample(sample)
+                d = (1 - weight) * d_from + weight * d_to
+            else:
+                current_scenario = get_scenario_at_sample(i)
+                x = self.reference_paths[current_scenario].filter_sample(sample)
+                d = self.primary_paths[current_scenario].filter_sample(sample)
+
+            reference.append(x)
+            desired.append(d)
+
+            y = self.fxlms.generate_antinoise(x)
+            antinoise.append(y)
+
+            y_at_error = self.secondary_path.filter_sample(y)
+
+            e = d + y_at_error
+            error.append(e)
+            mse.append(e ** 2)
+
+            self.fxlms.filter_reference(x)
+            self.fxlms.update_weights(e)
+
+            if (i + 1) % snapshot_interval == 0:
+                weights_history.append(self.fxlms.weights.copy())
+
+            if progress_callback and (i + 1) % (n_samples // 20) == 0:
+                progress = (i + 1) / n_samples
+                current_mse = np.mean(mse[-1000:]) if len(mse) > 1000 else np.mean(mse)
+                progress_callback(progress, current_mse)
+
+        desired_arr = np.array(desired)
+        error_arr = np.array(error)
+
+        steady_start = len(desired_arr) // 2
+        d_power = np.mean(desired_arr[steady_start:] ** 2)
+        e_power = np.mean(error_arr[steady_start:] ** 2)
+
+        if e_power > 1e-10:
+            noise_reduction_db = 10 * np.log10(d_power / e_power)
+        else:
+            noise_reduction_db = 60.0
+
+        conv_time = convergence_time_90pct(
+            mse, sample_rate=self.fs,
+            desired=desired_arr, error=error_arr
+        )
+
+        self.results = {
+            'noise_source': noise_source,
+            'reference': np.array(reference),
+            'desired': desired_arr,
+            'antinoise': np.array(antinoise),
+            'error': error_arr,
+            'mse': np.array(mse),
+            'noise_reduction_db': noise_reduction_db,
+            'convergence_time': conv_time,
+            'weights': self.fxlms.weights.copy(),
+            'weights_history': np.array(weights_history),
+            'duration': duration,
+            'fs': self.fs,
+            'params': self.params,
+            'scenario_order': scenario_order,
+            'segment_boundaries': segment_boundaries,
+        }
+
+        return self.results
+
+
+class DynamicRideMultiRefMicSimulation:
+    """
+    Dynamic Ride simulation with multiple noise source positions AND multiple reference mics.
+    Combines dynamic position switching with 4-ref-mic averaging.
+    """
+
+    def __init__(self, params: dict):
+        self.params = params
+        self.fs = params.get('sample_rate', 16000)
+        self.crossfade_ms = 100.0
+        self.ref_mics = params.get('ref_mics', {})
+
+        if not self.ref_mics:
+            raise ValueError("No reference mics defined for multi-ref-mic mode")
+
+        self.ref_mic_names = list(self.ref_mics.keys())
+
+        # Build room with all noise source positions and all ref mics
+        self.room = self._create_room()
+        self.room.compute_rir()
+
+        max_len = 512
+        positions = params['positions']
+
+        # Source indices for noise positions
+        self.scenario_source_idx = {
+            'idle': 0,
+            'city': 1,
+            'highway': 2,
+            'acceleration': 3,
+        }
+
+        # Error mic is the last mic
+        error_mic_idx = len(self.ref_mic_names)
+
+        # Reference paths: each noise source -> each ref mic
+        # Structure: H_reference[scenario][ref_mic_name] = RIR
+        self.H_reference = {}
+        for scenario, src_idx in self.scenario_source_idx.items():
+            self.H_reference[scenario] = {}
+            for i, name in enumerate(self.ref_mic_names):
+                self.H_reference[scenario][name] = self.room.rir[i][src_idx][:max_len]
+
+        # Primary paths: each noise source -> error mic
+        self.H_primary = {}
+        for scenario, src_idx in self.scenario_source_idx.items():
+            self.H_primary[scenario] = self.room.rir[error_mic_idx][src_idx][:max_len]
+
+        # Secondary path: speaker -> error mic (speaker is source 4)
+        self.H_secondary = self.room.rir[error_mic_idx][4][:max_len]
+        self.H_secondary_est = self.H_secondary * (
+            1 + 0.05 * np.random.randn(len(self.H_secondary))
+        )
+
+        # Create FIR filters
+        self.primary_paths = {
+            scenario: FIRPath(self.H_primary[scenario])
+            for scenario in self.scenario_source_idx.keys()
+        }
+        # Reference paths: nested dict [scenario][ref_mic_name]
+        self.reference_paths = {}
+        for scenario in self.scenario_source_idx.keys():
+            self.reference_paths[scenario] = {
+                name: FIRPath(self.H_reference[scenario][name])
+                for name in self.ref_mic_names
+            }
+        self.secondary_path = FIRPath(self.H_secondary)
+
+        # Create FxNLMS
+        self.fxlms = _create_fxlms(params, self.H_secondary_est, self.fs)
+
+        self.noise_gen = NoiseMixer(self.fs)
+        self.results = {}
+
+    def _create_room(self) -> pra.ShoeBox:
+        dims = self.params['dimensions']
+        absorption = self.params['absorption']
+        max_order = self.params['max_order']
+        positions = self.params['positions']
+
+        materials = {
+            'ceiling': pra.Material(absorption * 1.1),
+            'floor': pra.Material(absorption * 1.5),
+            'east': pra.Material(absorption * 0.5),
+            'west': pra.Material(absorption * 0.5),
+            'north': pra.Material(absorption * 0.7),
+            'south': pra.Material(absorption * 0.9),
+        }
+
+        room = pra.ShoeBox(
+            dims, fs=self.fs, materials=materials,
+            max_order=max_order, air_absorption=True
+        )
+
+        # Add all noise source positions as separate sources (0-3)
+        room.add_source(SCENARIO_NOISE_POSITIONS['idle'])
+        room.add_source(SCENARIO_NOISE_POSITIONS['city'])
+        room.add_source(SCENARIO_NOISE_POSITIONS['highway'])
+        room.add_source(SCENARIO_NOISE_POSITIONS['acceleration'])
+        # Source 4: Speaker
+        room.add_source(positions['speaker'])
+
+        # Build mic array: all ref mics + error mic
+        mic_positions = [self.ref_mics[name] for name in self.ref_mic_names]
+        mic_positions.append(positions['error_mic'])
+        mic_array = np.array(mic_positions).T
+        room.add_microphone_array(pra.MicrophoneArray(mic_array, fs=self.fs))
+
+        return room
+
+    def run(self, progress_callback=None) -> dict:
+        duration = self.params['duration']
+        crossfade_samples = int(self.crossfade_ms / 1000.0 * self.fs)
+
+        noise_source, scenario_order, segment_boundaries = \
+            self.noise_gen.generate_dynamic_scenario(duration, crossfade_ms=self.crossfade_ms)
+        n_samples = len(noise_source)
+
+        # Reset filters
+        self.fxlms.reset()
+        self.secondary_path.reset()
+        for path in self.primary_paths.values():
+            path.reset()
+        for scenario_paths in self.reference_paths.values():
+            for path in scenario_paths.values():
+                path.reset()
+
+        # Storage
+        reference = []
+        desired = []
+        antinoise = []
+        error = []
+        mse = []
+        weights_history = []
+        snapshot_interval = int(WEIGHT_SNAPSHOT_INTERVAL_S * self.fs)
+        ref_mic_signals = {name: [] for name in self.ref_mic_names}
+
+        def get_scenario_at_sample(sample_idx):
+            for i, boundary in enumerate(segment_boundaries):
+                if i == len(segment_boundaries) - 1:
+                    return scenario_order[i]
+                if sample_idx < segment_boundaries[i + 1]:
+                    return scenario_order[i]
+            return scenario_order[-1]
+
+        def get_crossfade_weight(sample_idx):
+            for i in range(1, len(segment_boundaries)):
+                boundary = segment_boundaries[i]
+                adjusted_boundary = boundary - (i * crossfade_samples)
+                if adjusted_boundary - crossfade_samples <= sample_idx < adjusted_boundary:
+                    progress = (sample_idx - (adjusted_boundary - crossfade_samples)) / crossfade_samples
+                    return progress, scenario_order[i-1], scenario_order[i]
+            return None
+
+        for i in range(n_samples):
+            sample = noise_source[i]
+            crossfade_info = get_crossfade_weight(i)
+
+            if crossfade_info is not None:
+                weight, from_scenario, to_scenario = crossfade_info
+
+                ref_signals_sample = {}
+                for name in self.ref_mic_names:
+                    x_from = self.reference_paths[from_scenario][name].filter_sample(sample)
+                    x_to = self.reference_paths[to_scenario][name].filter_sample(sample)
+                    ref_sig = (1 - weight) * x_from + weight * x_to
+                    ref_signals_sample[name] = ref_sig
+                    ref_mic_signals[name].append(ref_sig)
+
+                x = np.mean(list(ref_signals_sample.values()))
+
+                d_from = self.primary_paths[from_scenario].filter_sample(sample)
+                d_to = self.primary_paths[to_scenario].filter_sample(sample)
+                d = (1 - weight) * d_from + weight * d_to
+            else:
+                current_scenario = get_scenario_at_sample(i)
+
+                ref_signals_sample = {}
+                for name in self.ref_mic_names:
+                    ref_sig = self.reference_paths[current_scenario][name].filter_sample(sample)
+                    ref_signals_sample[name] = ref_sig
+                    ref_mic_signals[name].append(ref_sig)
+
+                x = np.mean(list(ref_signals_sample.values()))
+                d = self.primary_paths[current_scenario].filter_sample(sample)
+
+            reference.append(x)
+            desired.append(d)
+
+            y = self.fxlms.generate_antinoise(x)
+            antinoise.append(y)
+
+            y_at_error = self.secondary_path.filter_sample(y)
+            e = d + y_at_error
+            error.append(e)
+            mse.append(e ** 2)
+
+            self.fxlms.filter_reference(x)
+            self.fxlms.update_weights(e)
+
+            if (i + 1) % snapshot_interval == 0:
+                weights_history.append(self.fxlms.weights.copy())
+
+            if progress_callback and (i + 1) % (n_samples // 20) == 0:
+                progress = (i + 1) / n_samples
+                current_mse = np.mean(mse[-1000:]) if len(mse) > 1000 else np.mean(mse)
+                progress_callback(progress, current_mse)
+
+        desired_arr = np.array(desired)
+        error_arr = np.array(error)
+
+        steady_start = len(desired_arr) // 2
+        d_power = np.mean(desired_arr[steady_start:] ** 2)
+        e_power = np.mean(error_arr[steady_start:] ** 2)
+
+        if e_power > 1e-10:
+            noise_reduction_db = 10 * np.log10(d_power / e_power)
+        else:
+            noise_reduction_db = 60.0
+
+        conv_time = convergence_time_90pct(
+            mse, sample_rate=self.fs,
+            desired=desired_arr, error=error_arr
+        )
+
+        ref_mic_signals_arr = {name: np.array(sig) for name, sig in ref_mic_signals.items()}
+
+        self.results = {
+            'noise_source': noise_source,
+            'reference': np.array(reference),
+            'desired': desired_arr,
+            'antinoise': np.array(antinoise),
+            'error': error_arr,
+            'mse': np.array(mse),
+            'noise_reduction_db': noise_reduction_db,
+            'convergence_time': conv_time,
+            'weights': self.fxlms.weights.copy(),
+            'weights_history': np.array(weights_history),
+            'duration': duration,
+            'fs': self.fs,
+            'params': self.params,
+            'scenario_order': scenario_order,
+            'segment_boundaries': segment_boundaries,
+            'num_ref_mics': len(self.ref_mics),
+            'ref_mic_names': list(self.ref_mics.keys()),
+            'ref_mic_signals': ref_mic_signals_arr,
         }
 
         return self.results
@@ -908,12 +1429,20 @@ def run_simulation(params: dict, progress_callback=None) -> dict:
     try:
         speaker_mode = params.get('speaker_mode', 'Single Speaker')
         ref_mic_mode = params.get('ref_mic_mode', 'Single Reference Mic')
+        scenario = params.get('scenario', 'highway')
 
         is_multi_speaker = speaker_mode == '4-Speaker System'
         is_multi_ref_mic = ref_mic_mode == '4-Reference Mic System'
+        is_dynamic_ride = scenario == 'dynamic ride'
 
         # Select appropriate simulation class
-        if is_multi_ref_mic and is_multi_speaker:
+        if is_dynamic_ride:
+            # Dynamic ride uses special simulation with multi-position RIRs
+            if is_multi_ref_mic:
+                sim = DynamicRideMultiRefMicSimulation(params)
+            else:
+                sim = DynamicRideSimulation(params)
+        elif is_multi_ref_mic and is_multi_speaker:
             sim = MultiRefMicMultiSpeakerSimulation(params)
         elif is_multi_ref_mic:
             sim = MultiRefMicSimulation(params)

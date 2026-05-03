@@ -14,7 +14,7 @@ from presets import (
     ROOM_PRESETS, SCENARIO_PRESETS, NOISE_PRESETS,
     FXLMS_PRESETS, DEFAULTS, FOUR_SPEAKER_CONFIG, SPEAKER_MODES,
     FOUR_REF_MIC_CONFIG, REF_MIC_MODES, NOISE_SOURCE_POSITIONS,
-    SCENARIO_NOISE_POSITIONS
+    SCENARIO_NOISE_POSITIONS, REAL_AUDIO_FILES
 )
 
 
@@ -321,6 +321,17 @@ def render_sidebar() -> Dict[str, Any]:
     params['scenario'] = scenario_name.lower()
     params['noise_mode'] = 'scenario'
 
+    # Real audio file selector
+    is_real_audio = scenario_name == 'Real Car Recording'
+    if is_real_audio:
+        real_audio_choice = st.sidebar.selectbox(
+            "Recording",
+            options=list(REAL_AUDIO_FILES.keys()),
+            key="real_audio_select",
+            on_change=on_param_change
+        )
+        params['audio_file'] = REAL_AUDIO_FILES[real_audio_choice]
+
     # Get scenario-based noise position (for display and initial setup only)
     noise_pos_key = SCENARIO_NOISE_POSITIONS.get(scenario_name, 'Combined (Dashboard)')
     auto_noise_pos = NOISE_SOURCE_POSITIONS[noise_pos_key]
@@ -364,17 +375,45 @@ def render_sidebar() -> Dict[str, Any]:
         on_change=on_param_change
     )
 
+    params['leakage'] = st.sidebar.select_slider(
+        "Leakage Factor",
+        options=[0.0, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05],
+        value=st.session_state.get('leakage_val', 0.0),
+        key="leakage_val",
+        format_func=lambda x: f"{x:.4f}" if x > 0 else "Off",
+        on_change=on_param_change,
+        help="Weight decay to prevent coefficient drift on non-stationary noise"
+    )
+
     # ==================== Simulation Settings ====================
     st.sidebar.header("⏱️ Simulation")
 
-    # Adjust duration limits for Dynamic Ride (needs at least 2s per scenario)
+    # Adjust duration limits based on scenario
     is_dynamic_ride = scenario_name == 'Dynamic Ride'
-    min_duration = 8.0 if is_dynamic_ride else 2.0
-    max_duration = 20.0 if is_dynamic_ride else 10.0
+    is_real_audio_scenario = scenario_name == 'Real Car Recording'
 
-    # Clamp current value to valid range
-    current_duration = st.session_state.get('duration_val', DEFAULTS['duration'])
-    current_duration = max(min_duration, min(max_duration, current_duration))
+    if is_real_audio_scenario:
+        from scipy.io import wavfile as _wavfile
+        audio_path = params.get('audio_file', '')
+        try:
+            _fs, _data = _wavfile.read(audio_path)
+            file_duration = len(_data) / _fs
+        except Exception:
+            file_duration = 10.0
+        min_duration = 2.0
+        max_duration = min(file_duration, 30.0)
+        current_duration = max_duration
+        st.sidebar.caption(f"Recording length: {file_duration:.1f}s")
+    elif is_dynamic_ride:
+        min_duration = 8.0
+        max_duration = 20.0
+        current_duration = st.session_state.get('duration_val', DEFAULTS['duration'])
+        current_duration = max(min_duration, min(max_duration, current_duration))
+    else:
+        min_duration = 2.0
+        max_duration = 10.0
+        current_duration = st.session_state.get('duration_val', DEFAULTS['duration'])
+        current_duration = max(min_duration, min(max_duration, current_duration))
 
     params['duration'] = st.sidebar.slider(
         "Duration (seconds)",
