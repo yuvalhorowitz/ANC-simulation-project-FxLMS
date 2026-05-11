@@ -329,4 +329,12 @@ REAL_AUDIO_FILES = {
     'Real Car 3': _os.path.join(_REAL_NOISES_DIR, 'realcar3.wav'),
     'Real Car 4': _os.path.join(_REAL_NOISES_DIR, 'realcar4.wav'),
     'Real Car 5': _os.path.join(_REAL_NOISES_DIR, 'realcar5.wav'),
+    'LA City Start': _os.path.join(_REAL_NOISES_DIR, 'la_city_start.wav'),
+    'LA Stop & Go': _os.path.join(_REAL_NOISES_DIR, 'la_city_stop_go.wav'),
+    'LA Quiet Cruise': _os.path.join(_REAL_NOISES_DIR, 'la_quiet_cruise.wav'),
+    'LA Idle': _os.path.join(_REAL_NOISES_DIR, 'la_idle.wav'),
+    'LA Varying': _os.path.join(_REAL_NOISES_DIR, 'la_varying.wav'),
+    'LA Medium Cruise': _os.path.join(_REAL_NOISES_DIR, 'la_medium_cruise.wav'),
+    'LA Loud Low-Freq': _os.path.join(_REAL_NOISES_DIR, 'la_loud_low.wav'),
+    'LA Late Drive': _os.path.join(_REAL_NOISES_DIR, 'la_late_drive.wav'),
 }
