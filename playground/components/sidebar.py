@@ -221,14 +221,28 @@ def render_sidebar() -> Dict[str, Any]:
     )
 
     # ==================== Speaker Mode ====================
+    # Read MIMO mode from session state (set in last render) to determine locks.
+    # All MIMO stages require 4-Speaker; Stage 3 also requires 4-Reference Mic.
+    current_mimo = st.session_state.get('mimo_mode_val', 'Off')
+    mimo_active = current_mimo != 'Off'
+    mimo_stage3 = current_mimo == 'Stage 3 Full MIMO (N×M×K)'
+
     st.sidebar.header("🔊 Speaker Setup")
+
+    # Force 4-Speaker mode when MIMO is on (set BEFORE the radio reads session_state)
+    if mimo_active:
+        st.session_state.speaker_mode_select = '4-Speaker System'
+
     speaker_mode = st.sidebar.radio(
-        "Speaker Mode",
+        "Speaker Mode" + (" 🔒" if mimo_active else ""),
         options=list(SPEAKER_MODES.keys()),
         index=0 if st.session_state.get('speaker_mode', 'Single Speaker') == 'Single Speaker' else 1,
         key="speaker_mode_select",
         on_change=on_param_change,
-        help="Single speaker or 4-speaker system"
+        disabled=mimo_active,
+        help="Single speaker or 4-speaker system" + (
+            "\n🔒 Locked because MIMO mode requires 4-Speaker System." if mimo_active else ""
+        ),
     )
     st.session_state.speaker_mode = speaker_mode
     params['speaker_mode'] = speaker_mode
@@ -251,14 +265,17 @@ def render_sidebar() -> Dict[str, Any]:
         col1, col2 = st.sidebar.columns(2)
         for i, (key, label) in enumerate(speaker_names.items()):
             col = col1 if i % 2 == 0 else col2
-            # Default all speakers to enabled
+            # When MIMO is active, force all speakers enabled (algorithm needs M=4)
+            if mimo_active:
+                st.session_state[f'speaker_{key}_enabled'] = True
             default_enabled = st.session_state.get(f'speaker_{key}_enabled', True)
             enabled = col.checkbox(
                 label.split('(')[0].strip(),  # Short label
                 value=default_enabled,
                 key=f'speaker_{key}_enabled',
                 on_change=on_param_change,
-                help=label
+                disabled=mimo_active,
+                help=label + ("\n🔒 Locked: MIMO needs all 4 speakers." if mimo_active else ""),
             )
             if enabled:
                 enabled_speakers[key] = FOUR_SPEAKER_CONFIG[key].copy()
@@ -276,13 +293,21 @@ def render_sidebar() -> Dict[str, Any]:
 
     # ==================== Reference Mic Mode ====================
     st.sidebar.header("🎤 Reference Mic Setup")
+
+    # Stage 3 forces 4-Reference Mic System
+    if mimo_stage3:
+        st.session_state.ref_mic_mode_select = '4-Reference Mic System'
+
     ref_mic_mode = st.sidebar.radio(
-        "Reference Mic Mode",
+        "Reference Mic Mode" + (" 🔒" if mimo_stage3 else ""),
         options=list(REF_MIC_MODES.keys()),
         index=0 if st.session_state.get('ref_mic_mode', 'Single Reference Mic') == 'Single Reference Mic' else 1,
         key="ref_mic_mode_select",
         on_change=on_param_change,
-        help="Single or 4 strategic reference mics"
+        disabled=mimo_stage3,
+        help="Single or 4 strategic reference mics" + (
+            "\n🔒 Locked: Stage 3 Full MIMO requires 4 reference mics." if mimo_stage3 else ""
+        ),
     )
     st.session_state.ref_mic_mode = ref_mic_mode
     params['ref_mic_mode'] = ref_mic_mode
@@ -305,14 +330,17 @@ def render_sidebar() -> Dict[str, Any]:
         col1, col2 = st.sidebar.columns(2)
         for i, (key, label) in enumerate(ref_mic_names.items()):
             col = col1 if i % 2 == 0 else col2
-            # Default all ref mics to enabled
+            # Stage 3 needs all 4 ref mics
+            if mimo_stage3:
+                st.session_state[f'ref_mic_{key}_enabled'] = True
             default_enabled = st.session_state.get(f'ref_mic_{key}_enabled', True)
             enabled = col.checkbox(
                 label.split('(')[0].strip(),  # Short label
                 value=default_enabled,
                 key=f'ref_mic_{key}_enabled',
                 on_change=on_param_change,
-                help=label
+                disabled=mimo_stage3,
+                help=label + ("\n🔒 Locked: Stage 3 needs all 4 ref mics." if mimo_stage3 else ""),
             )
             if enabled:
                 enabled_ref_mics[key] = FOUR_REF_MIC_CONFIG[key].copy()
@@ -393,13 +421,24 @@ def render_sidebar() -> Dict[str, Any]:
         on_change=on_param_change
     )
 
+    # Stage 3 has 4× more weights, so larger step sizes diverge.
+    # Cap step size options for Stage 3 stability.
+    if mimo_stage3:
+        st.session_state.step_size_val = min(
+            st.session_state.get('step_size_val', 0.001), 0.001
+        )
+    step_size_options = [0.0001, 0.0003, 0.0005, 0.001] if mimo_stage3 \
+                       else [0.001, 0.003, 0.005, 0.007, 0.01, 0.015, 0.02]
+
     params['step_size'] = st.sidebar.select_slider(
-        "Step Size (μ)",
-        options=[0.001, 0.003, 0.005, 0.007, 0.01, 0.015, 0.02],
+        "Step Size (μ)" + (" 🔒" if mimo_stage3 else ""),
+        options=step_size_options,
         value=st.session_state.get('step_size_val', fxlms['step_size']),
         key="step_size_val",
         format_func=lambda x: f"{x:.4f}",
-        on_change=on_param_change
+        on_change=on_param_change,
+        help=("Stage 3 caps step ≤ 0.001 for stability (4× more weights than Stage 2)"
+              if mimo_stage3 else None),
     )
 
     params['leakage'] = st.sidebar.select_slider(

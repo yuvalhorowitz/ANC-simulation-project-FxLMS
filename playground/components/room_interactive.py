@@ -238,7 +238,9 @@ def create_interactive_room_diagram(
     selected_component: Optional[str] = None,
     speakers_4ch: Optional[Dict[str, List[float]]] = None,
     ref_mics_4ch: Optional[Dict[str, List[float]]] = None,
-    is_car: bool = True
+    is_car: bool = True,
+    extra_error_mics: Optional[List[List[float]]] = None,
+    head_zone_radius_m: Optional[float] = None,
 ) -> go.Figure:
     """
     Create an interactive Plotly room diagram with car interior.
@@ -250,6 +252,9 @@ def create_interactive_room_diagram(
         speakers_4ch: Optional dict of 4-speaker positions (for multi-speaker mode)
         ref_mics_4ch: Optional dict of 4-ref-mic positions (for multi-ref-mic mode)
         is_car: Whether to draw car interior elements
+        extra_error_mics: Optional list of additional error mic positions (Stage 2/3)
+        head_zone_radius_m: Optional head-zone radius in meters; draws a circle
+            around the central error_mic showing the cancellation region.
     """
     length, width, height = dimensions
     is_multi_speaker = speakers_4ch is not None and len(speakers_4ch) > 0
@@ -445,6 +450,54 @@ def create_interactive_room_diagram(
                 )
             ))
 
+    # MIMO head-zone visualization: circle of cancellation + extra error mics
+    if head_zone_radius_m is not None and 'error_mic' in positions:
+        cx, cy = positions['error_mic'][0], positions['error_mic'][1]
+        r = head_zone_radius_m
+        # Draw the head-zone circle on the floor plan (top-down) — represents
+        # the cancellation region where K=4 error mics try to minimize noise.
+        fig.add_shape(
+            type="circle",
+            xref="x", yref="y",
+            x0=cx - r, y0=cy - r,
+            x1=cx + r, y1=cy + r,
+            line=dict(color="#9b59b6", width=2, dash="dot"),
+            fillcolor="rgba(155, 89, 182, 0.10)",
+            layer="below",
+        )
+        # Annotate radius
+        fig.add_annotation(
+            x=cx + r, y=cy,
+            text=f"{r * 100:.0f} cm",
+            showarrow=False,
+            font=dict(size=10, color="#7d3c98"),
+            xanchor="left",
+            xshift=4,
+        )
+
+    if extra_error_mics:
+        # Draw the K extra error mics as small purple X's around the main error mic
+        xs = [pos[0] for pos in extra_error_mics]
+        ys = [pos[1] for pos in extra_error_mics]
+        zs = [pos[2] for pos in extra_error_mics]
+        fig.add_trace(go.Scatter(
+            x=xs, y=ys,
+            mode='markers',
+            marker=dict(
+                color='#9b59b6',
+                size=14,
+                symbol='x-thin',
+                line=dict(color='#7d3c98', width=3),
+            ),
+            name=f'MIMO error mics (×{len(extra_error_mics)})',
+            hovertemplate=(
+                "<b>MIMO error mic</b><br>"
+                "X: %{x:.2f} m<br>"
+                "Y: %{y:.2f} m<br>"
+                "<extra></extra>"
+            ),
+        ))
+
     # Layout configuration
     mode_parts = []
     if is_multi_speaker:
@@ -562,10 +615,21 @@ def render_interactive_room(params: dict) -> dict:
     # Create two columns: diagram on left, sliders on right
     col_diagram, col_sliders = st.columns([2, 1])
 
+    # MIMO head-zone visualization params
+    mimo_mode = params.get('mimo_mode', 'Off')
+    extra_error_mics = None
+    head_zone_radius_m = None
+    if mimo_mode in ('Stage 2 SIMO+multi-error (1×M×K)', 'Stage 3 Full MIMO (N×M×K)'):
+        extra_error_mics = params.get('error_mics_positions')
+        head_zone_cm = st.session_state.get('head_zone_cm', 5)
+        head_zone_radius_m = head_zone_cm / 100.0
+
     with col_diagram:
         # Display the room diagram
         fig = create_interactive_room_diagram(
-            dimensions, positions, active_component, speakers_4ch, ref_mics_4ch
+            dimensions, positions, active_component, speakers_4ch, ref_mics_4ch,
+            extra_error_mics=extra_error_mics,
+            head_zone_radius_m=head_zone_radius_m,
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
