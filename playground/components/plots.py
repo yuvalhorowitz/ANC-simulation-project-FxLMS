@@ -272,6 +272,11 @@ def plot_filter_coefficients(results: Dict[str, Any]) -> plt.Figure:
 def plot_filter_coefficients_over_time(results: Dict[str, Any]) -> plt.Figure:
     """
     Heatmap showing how filter coefficients evolve over time.
+
+    For MIMO Stage 3 (4096+ weights organized as M speakers × N refs × L taps),
+    a flat heatmap squashes all 16 filters together and changes look invisible.
+    In that case we add a second panel decomposing the L2 norm of each
+    (speaker, ref) sub-filter so you can see WHICH filters are adapting.
     """
     weights_history = results.get('weights_history')
     if weights_history is None or len(weights_history) == 0:
@@ -283,30 +288,80 @@ def plot_filter_coefficients_over_time(results: Dict[str, Any]) -> plt.Figure:
     duration = results['duration']
     time_labels = np.linspace(WEIGHT_SNAPSHOT_INTERVAL_S, duration, n_snapshots)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
+    # Detect MIMO Stage 3 layout (M speakers × N refs × L taps)
+    M = results.get('num_speakers', 1)
+    N = results.get('num_reference_mics', 1) if results.get('algorithm') == 'true_mimo_full' else 1
+    L_per_filter = n_taps // (M * N) if M * N > 0 else n_taps
+    is_mimo_full = (results.get('algorithm') == 'true_mimo_full' and M > 1 and N > 1
+                    and M * N * L_per_filter == n_taps)
 
-    # Heatmap
+    if is_mimo_full:
+        fig, (ax1, ax2, ax3) = plt.subplots(
+            3, 1, figsize=(11, 11), height_ratios=[2, 1.4, 1]
+        )
+    else:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), height_ratios=[2, 1])
+        ax3 = None
+
+    # Heatmap (full weights)
+    vmax = max(np.max(np.abs(weights_history)), 1e-10)
     im = ax1.imshow(
         weights_history.T,
         aspect='auto',
         origin='lower',
         cmap='RdBu_r',
         extent=[time_labels[0], time_labels[-1], 0, n_taps],
-        vmin=-np.max(np.abs(weights_history)),
-        vmax=np.max(np.abs(weights_history)),
+        vmin=-vmax, vmax=vmax,
     )
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Tap Index')
-    ax1.set_title(f'Filter Coefficients Over Time ({n_taps} taps, {n_snapshots} snapshots)')
+    title = f'Filter Coefficients Over Time ({n_taps} taps, {n_snapshots} snapshots)'
+    if is_mimo_full:
+        title += f'\nMIMO Stage 3: {M} speakers × {N} ref mics × {L_per_filter} taps each'
+    ax1.set_title(title)
     fig.colorbar(im, ax=ax1, label='Weight Value')
 
-    # L2 norm of weights over time
-    norms = np.linalg.norm(weights_history, axis=1)
-    ax2.plot(time_labels, norms, 'b-', linewidth=1.5)
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('L2 Norm')
-    ax2.set_title('Filter Weight Magnitude Over Time')
-    ax2.grid(True, alpha=0.3)
+    if is_mimo_full:
+        # Per-(speaker, ref) sub-filter L2 norms — much more legible
+        # weights are stored as W.flatten() with shape (M, N, L) → row order
+        # speaker0_ref0 (L taps), speaker0_ref1, ..., speakerM_refN
+        norms_per_filter = np.zeros((n_snapshots, M, N))
+        for s in range(n_snapshots):
+            w = weights_history[s].reshape(M, N, L_per_filter)
+            norms_per_filter[s] = np.linalg.norm(w, axis=2)
+
+        ref_labels = results.get('ref_mic_names', [f'ref{i}' for i in range(N)])
+        spk_labels = results.get('speaker_names', [f'spk{i}' for i in range(M)])
+        cmap = plt.get_cmap('tab20')
+        for m in range(M):
+            for n in range(N):
+                line_idx = m * N + n
+                ax2.plot(time_labels, norms_per_filter[:, m, n],
+                         label=f'{spk_labels[m]} ← {ref_labels[n]}',
+                         color=cmap(line_idx % 20),
+                         linewidth=1.3, alpha=0.85)
+        ax2.set_xlabel('Time (s)')
+        ax2.set_ylabel('L2 norm per filter')
+        ax2.set_title('Per-(speaker, ref-mic) sub-filter magnitude over time '
+                      f'({M*N} filters)')
+        ax2.legend(fontsize=7, ncol=4, loc='upper right')
+        ax2.grid(True, alpha=0.3)
+
+        # ax3 shows aggregate L2 (overall convergence)
+        norms = np.linalg.norm(weights_history, axis=1)
+        ax3.plot(time_labels, norms, 'b-', linewidth=2)
+        ax3.set_xlabel('Time (s)')
+        ax3.set_ylabel('Total L2 Norm')
+        ax3.set_title('Overall Filter Magnitude Over Time')
+        ax3.grid(True, alpha=0.3)
+    else:
+        # Original L2 norm panel for non-MIMO-Stage-3 cases
+        norms = np.linalg.norm(weights_history, axis=1)
+        ax2.plot(time_labels, norms, 'b-', linewidth=1.5)
+        ax2.set_xlabel('Time (s)')
+        ax2.set_ylabel('L2 Norm')
+        ax2.set_title('Filter Weight Magnitude Over Time')
+        ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
     return fig

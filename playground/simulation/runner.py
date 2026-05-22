@@ -1472,12 +1472,24 @@ def run_simulation(params: dict, progress_callback=None) -> dict:
 
         results = sim.run(progress_callback)
 
-        # For Stage 2/3 MIMO, add aggregate fields for plot compatibility
+        # For Stage 2/3 MIMO, expose aggregate fields for plot/audio compatibility.
+        # Two important conventions:
+        #   - 'desired' and 'error' (used by plots AND audio playback) take the
+        #     FIRST error mic only. This corresponds to what an actual ear
+        #     placed at that physical point would hear. Using the mean across
+        #     K mics introduces spatial-averaging phase cancellation that
+        #     strips high-frequency content from both signals — making the dB
+        #     metric look better than the audible reality and producing
+        #     "before" and "after" audio that both sound similarly muffled.
+        #   - 'desired_per_mic' / 'error_per_mic' / 'noise_reduction_per_mic_db'
+        #     are kept for plots/analysis that want the head-zone average.
         if use_mimo and 'error_per_mic' in results:
             error_per_mic = results['error_per_mic']
             desired_per_mic = results['desired_per_mic']
-            results['error'] = np.mean(error_per_mic, axis=1)
-            results['desired'] = np.mean(desired_per_mic, axis=1)
+            results['error'] = error_per_mic[:, 0]    # single mic = real listener
+            results['desired'] = desired_per_mic[:, 0]
+            results['error_avg_across_mics'] = np.mean(error_per_mic, axis=1)
+            results['desired_avg_across_mics'] = np.mean(desired_per_mic, axis=1)
 
         results['success'] = True
         results['error_message'] = None
