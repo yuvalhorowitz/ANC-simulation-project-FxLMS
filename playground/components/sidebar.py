@@ -385,6 +385,34 @@ def render_sidebar() -> Dict[str, Any]:
         help="Weight decay to prevent coefficient drift on non-stationary noise"
     )
 
+    # ==================== MIMO mode (only with 4-Speaker System) ====================
+    is_4speaker = speaker_mode == '4-Speaker System'
+    mimo_options = [
+        'Off',
+        'Stage 1 SIMO (1×M×1)',
+        'Stage 2 SIMO+multi-error (1×M×K)',
+        'Stage 3 Full MIMO (N×M×K)',
+    ]
+    if is_4speaker:
+        params['mimo_mode'] = st.sidebar.selectbox(
+            "MIMO Algorithm",
+            options=mimo_options,
+            index=mimo_options.index(st.session_state.get('mimo_mode_val', 'Off'))
+                  if st.session_state.get('mimo_mode_val', 'Off') in mimo_options else 0,
+            key="mimo_mode_val",
+            on_change=on_param_change,
+            help=(
+                "Off = current 4-speaker broadcast (pseudo-SIMO).\n"
+                "Stage 1 = M independent filters per speaker.\n"
+                "Stage 2 = M independent filters + 4 head-zone error mics.\n"
+                "Stage 3 = N independent reference signals + M speakers + K error mics (true MIMO)."
+            )
+        )
+        if params['mimo_mode'] == 'Stage 3 Full MIMO (N×M×K)':
+            st.sidebar.caption("ℹ️ Stage 3 needs step ≤ 0.001 for stability (4× more weights)")
+    else:
+        params['mimo_mode'] = 'Off'
+
     # ==================== Simulation Settings ====================
     st.sidebar.header("⏱️ Simulation")
 

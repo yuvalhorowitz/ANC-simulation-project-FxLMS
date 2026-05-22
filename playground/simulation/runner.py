@@ -1430,32 +1430,60 @@ def run_simulation(params: dict, progress_callback=None) -> dict:
         speaker_mode = params.get('speaker_mode', 'Single Speaker')
         ref_mic_mode = params.get('ref_mic_mode', 'Single Reference Mic')
         scenario = params.get('scenario', 'highway')
+        mimo_mode = params.get('mimo_mode', 'Off')
 
         is_multi_speaker = speaker_mode == '4-Speaker System'
         is_multi_ref_mic = ref_mic_mode == '4-Reference Mic System'
         is_dynamic_ride = scenario == 'dynamic ride'
+        use_mimo = mimo_mode != 'Off' and is_multi_speaker and not is_dynamic_ride
 
         # Select appropriate simulation class
-        if is_dynamic_ride:
-            # Dynamic ride uses special simulation with multi-position RIRs
-            if is_multi_ref_mic:
-                sim = DynamicRideMultiRefMicSimulation(params)
+        if use_mimo:
+            # Lazy imports — only load if MIMO mode is active, so existing
+            # default behavior is unchanged.
+            if mimo_mode == 'Stage 1 SIMO (1×M×1)':
+                from playground.simulation.mimo_runner import MIMOSimulation
+                sim = MIMOSimulation(params)
+            elif mimo_mode == 'Stage 2 SIMO+multi-error (1×M×K)':
+                from playground.simulation.mimo_runner_multierror import MIMOSimulationMultiError
+                sim = MIMOSimulationMultiError(params)
+            elif mimo_mode == 'Stage 3 Full MIMO (N×M×K)':
+                from playground.simulation.mimo_runner_full import MIMOSimulationFull
+                sim = MIMOSimulationFull(params)
             else:
-                sim = DynamicRideSimulation(params)
-        elif is_multi_ref_mic and is_multi_speaker:
-            sim = MultiRefMicMultiSpeakerSimulation(params)
-        elif is_multi_ref_mic:
-            sim = MultiRefMicSimulation(params)
-        elif is_multi_speaker:
-            sim = MultiSpeakerSimulation(params)
-        else:
-            sim = PlaygroundSimulation(params)
+                # Unknown mimo_mode value — fall back to default dispatch
+                use_mimo = False
+
+        if not use_mimo:
+            if is_dynamic_ride:
+                # Dynamic ride uses special simulation with multi-position RIRs
+                if is_multi_ref_mic:
+                    sim = DynamicRideMultiRefMicSimulation(params)
+                else:
+                    sim = DynamicRideSimulation(params)
+            elif is_multi_ref_mic and is_multi_speaker:
+                sim = MultiRefMicMultiSpeakerSimulation(params)
+            elif is_multi_ref_mic:
+                sim = MultiRefMicSimulation(params)
+            elif is_multi_speaker:
+                sim = MultiSpeakerSimulation(params)
+            else:
+                sim = PlaygroundSimulation(params)
 
         results = sim.run(progress_callback)
+
+        # For Stage 2/3 MIMO, add aggregate fields for plot compatibility
+        if use_mimo and 'error_per_mic' in results:
+            error_per_mic = results['error_per_mic']
+            desired_per_mic = results['desired_per_mic']
+            results['error'] = np.mean(error_per_mic, axis=1)
+            results['desired'] = np.mean(desired_per_mic, axis=1)
+
         results['success'] = True
         results['error_message'] = None
         results['speaker_mode'] = speaker_mode
         results['ref_mic_mode'] = ref_mic_mode
+        results['mimo_mode'] = mimo_mode if use_mimo else 'Off'
         return results
 
     except Exception as e:
