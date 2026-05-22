@@ -378,7 +378,7 @@ def save_individual_panel(grid, label, speakers, error_mics, vmax_global,
 
 def save_combined_1x5(grids, labels, speakers_per, err_mics_per, extent,
                       audio_name):
-    """Combined 1×5 PNG."""
+    """Combined 1×5 PNG (wide layout)."""
     vmax = max(np.max(np.abs(g)) for g in grids)
     vmax = max(vmax, 5)
 
@@ -402,6 +402,58 @@ def save_combined_1x5(grids, labels, speakers_per, err_mics_per, extent,
                  fontsize=12, fontweight='bold', y=1.02)
 
     out_path = OUTPUT_DIR / 'heatmap_1x5_combined.png'
+    plt.savefig(out_path, dpi=140, bbox_inches='tight', facecolor='white')
+    plt.close()
+    print(f"  Saved combined: {out_path.name}")
+
+
+def save_combined_221(grids, labels, speakers_per, err_mics_per, extent,
+                       audio_name):
+    """Combined 2-2-1 square-ish PNG: baselines / SIMO / Full MIMO."""
+    vmax = max(np.max(np.abs(g)) for g in grids)
+    vmax = max(vmax, 5)
+
+    # 3 rows × 4 cols (gives 2/2/1 by spanning bottom panel across cols 1-2,
+    # which we approximate by using col 1 only — Stage 3 sits centered)
+    # We'll use 3 rows × 2 cols + a vertical colorbar
+    fig = plt.figure(figsize=(15, 14))
+    gs = fig.add_gridspec(3, 3, width_ratios=[1, 1, 0.04],
+                          hspace=0.30, wspace=0.18)
+
+    im = None
+    # Row 0: SISO, Pseudo-SIMO
+    ax = fig.add_subplot(gs[0, 0])
+    im = draw_one_panel(ax, grids[0], labels[0], speakers_per[0],
+                        err_mics_per[0], vmax, extent, show_axis_labels=True)
+    ax = fig.add_subplot(gs[0, 1])
+    im = draw_one_panel(ax, grids[1], labels[1], speakers_per[1],
+                        err_mics_per[1], vmax, extent, show_axis_labels=False)
+
+    # Row 1: Stage 1, Stage 2
+    ax = fig.add_subplot(gs[1, 0])
+    im = draw_one_panel(ax, grids[2], labels[2], speakers_per[2],
+                        err_mics_per[2], vmax, extent, show_axis_labels=True)
+    ax = fig.add_subplot(gs[1, 1])
+    im = draw_one_panel(ax, grids[3], labels[3], speakers_per[3],
+                        err_mics_per[3], vmax, extent, show_axis_labels=False)
+
+    # Row 2: Stage 3 — centered (span both columns)
+    ax = fig.add_subplot(gs[2, :2])
+    im = draw_one_panel(ax, grids[4], labels[4], speakers_per[4],
+                        err_mics_per[4], vmax, extent, show_axis_labels=True)
+
+    # Single shared colorbar on the right
+    cax = fig.add_subplot(gs[:, 2])
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.set_label('Noise reduction (dB)\nblue = cancellation, red = amplification',
+                   fontsize=10)
+
+    fig.suptitle(f'Full-Cabin Cancellation Patterns — Algorithm Comparison '
+                 f'(trained on {audio_name})\n'
+                 f'top: baselines · middle: Stage 1/2 SIMO · bottom: Stage 3 Full MIMO',
+                 fontsize=12, fontweight='bold', y=0.995)
+
+    out_path = OUTPUT_DIR / 'heatmap_2_2_1_combined.png'
     plt.savefig(out_path, dpi=140, bbox_inches='tight', facecolor='white')
     plt.close()
     print(f"  Saved combined: {out_path.name}")
@@ -494,6 +546,14 @@ def main():
 
     print("\nGenerating combined 1×5 heatmap...")
     save_combined_1x5(grids, [
+        f'{l}\n({c})' for l, c in zip(labels, [
+            '1 spk, 1 err mic', '4 spk broadcast', '4 spk indep',
+            '4 spk + 4 err', '4 ref + 4 spk + 4 err'
+        ])
+    ], speakers_per, err_mics_per, extent, audio_name)
+
+    print("\nGenerating combined 2-2-1 square heatmap...")
+    save_combined_221(grids, [
         f'{l}\n({c})' for l, c in zip(labels, [
             '1 spk, 1 err mic', '4 spk broadcast', '4 spk indep',
             '4 spk + 4 err', '4 ref + 4 spk + 4 err'
