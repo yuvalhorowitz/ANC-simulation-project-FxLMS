@@ -1,0 +1,115 @@
+{
+  "scenarios": {
+    "IDLE": {
+      "audio": "real_noises/la_idle.wav",
+      "duration_s": 20.0
+    },
+    "CRUISING": {
+      "audio": "real_noises/la_medium_cruise.wav",
+      "duration_s": 20.0
+    },
+    "ACCELERATION": {
+      "audio": "real_noises/la_varying.wav",
+      "duration_s": 20.0
+    }
+  },
+  "results": {
+    "SISO": {
+      "IDLE": {
+        "nr_db": 1.5933624283794,
+        "conv_s": 1.15625,
+        "stable": true
+      },
+      "CRUISING": {
+        "nr_db": 0.8089510986041699,
+        "conv_s": 0.90625,
+        "stable": true
+      },
+      "ACCELERATION": {
+        "nr_db": 0.9612865147952672,
+        "conv_s": 0.484375,
+        "stable": true
+      }
+    },
+    "Pseudo-SIMO": {
+      "IDLE": {
+        "nr_db": 5.315641845347203,
+        "conv_s": 0.25,
+        "stable": true
+      },
+      "CRUISING": {
+        "nr_db": 4.099120496947839,
+        "conv_s": 1.40625,
+        "stable": true
+      },
+      "ACCELERATION": {
+        "nr_db": 4.214898651575874,
+        "conv_s": 0.03125,
+        "stable": true
+      }
+    },
+    "Stage 1 SIMO": {
+      "IDLE": {
+        "nr_db": 6.148425416192566,
+        "conv_s": 0.984375,
+        "stable": true
+      },
+      "CRUISING": {
+        "nr_db": 4.124318463328443,
+        "conv_s": 2.4375,
+        "stable": true
+      },
+      "ACCELERATION": {
+        "nr_db": 5.050677241245316,
+        "conv_s": 0.46875,
+        "stable": true
+      }
+    },
+    "Stage 2 SIMO+multi-error": {
+      "IDLE": {
+        "nr_db": 5.4155263677794,
+        "conv_s": 1.40625,
+        "stable": true
+      },
+      "CRUISING": {
+        "nr_db": 2.763250435357767,
+        "conv_s": 4.203125,
+        "stable": true
+      },
+      "ACCELERATION": {
+        "nr_db": 4.511414568977992,
+        "conv_s": 1.09375,
+        "stable": true
+      }
+    },
+    "Stage 3 Full MIMO": {
+      "IDLE": {
+        "nr_db": 14.325072981968127,
+        "conv_s": 1.40625,
+        "stable": true
+      },
+      "CRUISING": {
+        "nr_db": 12.644708522491236,
+        "conv_s": 4.203125,
+        "stable": true
+      },
+      "ACCELERATION": {
+        "nr_db": 9.893933291360284,
+        "conv_s": 1.390625,
+        "stable": true
+      }
+    }
+  },
+  "config": {
+    "filter_length_default": 512,
+    "filter_length_stage3": 256,
+    "step_size_default": 0.003,
+    "step_size_stage3": 0.001,
+    "head_zone_radius_m": 0.05,
+    "error_mic_pos": [
+      2.5,
+      0.55,
+      1.05
+    ]
+  }
+}

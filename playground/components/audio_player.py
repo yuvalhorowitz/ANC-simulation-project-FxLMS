@@ -108,7 +108,7 @@ def create_comparison_audio(original: np.ndarray, cancelled: np.ndarray,
 
 def render_audio_player(results: Dict[str, Any]):
     """
-    Render audio players in Streamlit.
+    Render audio players in Streamlit with download buttons.
 
     Important: BOTH the original and cancelled signals are normalized using the
     SAME reference peak (the larger of the two peaks). This preserves their
@@ -135,23 +135,69 @@ def render_audio_player(results: Dict[str, Any]):
     rms_error = float(np.sqrt(np.mean(error ** 2)))
     rms_db_diff = 20 * np.log10(rms_desired / max(rms_error, 1e-12))
 
+    # Pre-render WAV bytes for both playback and download
+    original_bytes = signal_to_wav_bytes(desired, fs, reference_peak=ref_peak)
+    cancelled_bytes = signal_to_wav_bytes(error, fs, reference_peak=ref_peak)
+    comparison_bytes = create_comparison_audio(desired, error, fs)
+
+    # Filename suffix derived from MIMO mode + scenario for clearer downloads
+    mimo_mode = results.get('mimo_mode', 'Off')
+    suffix_parts = []
+    if mimo_mode and mimo_mode != 'Off':
+        # "Stage 1 SIMO (1×M×1)" → "stage1"
+        for tag, label in [('Stage 1', 'stage1'), ('Stage 2', 'stage2'),
+                           ('Stage 3', 'stage3')]:
+            if tag in mimo_mode:
+                suffix_parts.append(label)
+                break
+    else:
+        speaker_mode = results.get('speaker_mode', '')
+        if '4-Speaker' in speaker_mode:
+            suffix_parts.append('pseudo-simo')
+        else:
+            suffix_parts.append('siso')
+    nr_db = results.get('noise_reduction_db', 0)
+    suffix_parts.append(f"{nr_db:+.1f}dB".replace('+', 'p').replace('-', 'm'))
+    suffix = '_'.join(suffix_parts) if suffix_parts else 'output'
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("**Original Noise**")
         st.caption(f"RMS: {20*np.log10(max(rms_desired, 1e-12)):.1f} dBFS")
-        original_bytes = signal_to_wav_bytes(desired, fs, reference_peak=ref_peak)
         st.audio(original_bytes, format='audio/wav')
+        st.download_button(
+            label="⬇️ Download",
+            data=original_bytes,
+            file_name=f"original_{suffix}.wav",
+            mime="audio/wav",
+            key=f"download_original_{suffix}",
+            use_container_width=True,
+        )
 
     with col2:
         st.markdown("**With ANC**")
         st.caption(f"RMS: {20*np.log10(max(rms_error, 1e-12)):.1f} dBFS  "
                    f"(↓ {rms_db_diff:+.1f} dB vs original)")
-        cancelled_bytes = signal_to_wav_bytes(error, fs, reference_peak=ref_peak)
         st.audio(cancelled_bytes, format='audio/wav')
+        st.download_button(
+            label="⬇️ Download",
+            data=cancelled_bytes,
+            file_name=f"cancelled_{suffix}.wav",
+            mime="audio/wav",
+            key=f"download_cancelled_{suffix}",
+            use_container_width=True,
+        )
 
     with col3:
         st.markdown("**Comparison**")
         st.caption("Original → Silence → With ANC")
-        comparison_bytes = create_comparison_audio(desired, error, fs)
         st.audio(comparison_bytes, format='audio/wav')
+        st.download_button(
+            label="⬇️ Download",
+            data=comparison_bytes,
+            file_name=f"comparison_{suffix}.wav",
+            mime="audio/wav",
+            key=f"download_comparison_{suffix}",
+            use_container_width=True,
+        )
