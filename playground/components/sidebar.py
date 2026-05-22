@@ -101,6 +101,33 @@ def on_fxlms_preset_change():
     st.session_state.params_changed = True
 
 
+def on_mimo_mode_change():
+    """
+    Callback when MIMO Algorithm changes — auto-configures dependencies so the
+    selected stage works without manual UI fiddling.
+
+    Stage 1 SIMO         → requires 4-Speaker; ref/error mics unchanged
+    Stage 2 multi-error  → requires 4-Speaker; auto-creates K=4 head-zone error mics
+    Stage 3 Full MIMO    → requires 4-Speaker AND 4-Reference Mic System; K=4 head-zone error mics
+    """
+    mode = st.session_state.get('mimo_mode_val', 'Off')
+
+    if mode == 'Off':
+        st.session_state.params_changed = True
+        return
+
+    # All MIMO stages require 4-speaker mode
+    st.session_state.speaker_mode_select = '4-Speaker System'
+    st.session_state.speaker_mode = '4-Speaker System'
+
+    # Stage 3 also requires 4-reference-mic mode
+    if mode == 'Stage 3 Full MIMO (N×M×K)':
+        st.session_state.ref_mic_mode_select = '4-Reference Mic System'
+        st.session_state.ref_mic_mode = '4-Reference Mic System'
+
+    st.session_state.params_changed = True
+
+
 def on_scenario_change():
     """Callback when driving scenario changes - update noise source position."""
     scenario_name = st.session_state.scenario_select
@@ -386,32 +413,90 @@ def render_sidebar() -> Dict[str, Any]:
     )
 
     # ==================== MIMO mode (only with 4-Speaker System) ====================
-    is_4speaker = speaker_mode == '4-Speaker System'
     mimo_options = [
         'Off',
         'Stage 1 SIMO (1×M×1)',
         'Stage 2 SIMO+multi-error (1×M×K)',
         'Stage 3 Full MIMO (N×M×K)',
     ]
-    if is_4speaker:
-        params['mimo_mode'] = st.sidebar.selectbox(
-            "MIMO Algorithm",
-            options=mimo_options,
-            index=mimo_options.index(st.session_state.get('mimo_mode_val', 'Off'))
-                  if st.session_state.get('mimo_mode_val', 'Off') in mimo_options else 0,
-            key="mimo_mode_val",
-            on_change=on_param_change,
-            help=(
-                "Off = current 4-speaker broadcast (pseudo-SIMO).\n"
-                "Stage 1 = M independent filters per speaker.\n"
-                "Stage 2 = M independent filters + 4 head-zone error mics.\n"
-                "Stage 3 = N independent reference signals + M speakers + K error mics (true MIMO)."
-            )
+    is_4speaker = speaker_mode == '4-Speaker System'
+
+    # Show MIMO selector regardless — when not in 4-speaker mode, picking a
+    # MIMO option will auto-set 4-speaker mode (and 4-ref for Stage 3).
+    params['mimo_mode'] = st.sidebar.selectbox(
+        "MIMO Algorithm",
+        options=mimo_options,
+        index=mimo_options.index(st.session_state.get('mimo_mode_val', 'Off'))
+              if st.session_state.get('mimo_mode_val', 'Off') in mimo_options else 0,
+        key="mimo_mode_val",
+        on_change=on_mimo_mode_change,
+        help=(
+            "Off = current 4-speaker broadcast (pseudo-SIMO).\n"
+            "Stage 1 = M independent filters per speaker (auto-enables 4-Speaker).\n"
+            "Stage 2 = M independent filters + K=4 head-zone error mics.\n"
+            "Stage 3 = N independent reference signals + M speakers + K error mics "
+            "(auto-enables 4-Speaker AND 4-Reference Mic System; needs step ≤ 0.001)."
         )
-        if params['mimo_mode'] == 'Stage 3 Full MIMO (N×M×K)':
-            st.sidebar.caption("ℹ️ Stage 3 needs step ≤ 0.001 for stability (4× more weights)")
-    else:
-        params['mimo_mode'] = 'Off'
+    )
+
+    mimo_mode = params['mimo_mode']
+
+    # Show config summary + auto-set anything missing
+    if mimo_mode != 'Off':
+        # Stage 2 / Stage 3: K=4 head-zone error mics around driver headrest
+        needs_K4 = mimo_mode in (
+            'Stage 2 SIMO+multi-error (1×M×K)',
+            'Stage 3 Full MIMO (N×M×K)',
+        )
+
+        if needs_K4:
+            # Adjustable head-zone offset (default ±5 cm)
+            head_zone_cm = st.sidebar.slider(
+                "Head-zone radius (cm)",
+                min_value=2, max_value=15,
+                value=int(st.session_state.get('head_zone_cm', 5)),
+                step=1,
+                key='head_zone_cm',
+                on_change=on_param_change,
+                help="Half-extent of the 2×2 grid of error mics around the driver headrest"
+            )
+            # Build error mic positions from current error_mic position + offsets
+            cur_err_mic = (st.session_state.get('interactive_positions') or {}).get(
+                'error_mic',
+                ROOM_PRESETS[room_preset]['positions']['error_mic']
+            )
+            cx, cy, cz = cur_err_mic
+            d = head_zone_cm / 100.0
+            params['error_mics_positions'] = [
+                [cx, cy + d, cz + d],
+                [cx, cy - d, cz + d],
+                [cx, cy + d, cz - d],
+                [cx, cy - d, cz - d],
+            ]
+
+        # Inform the user about what got auto-configured
+        info_lines = []
+        if speaker_mode != '4-Speaker System':
+            info_lines.append("• Auto-enabled **4-Speaker System**")
+        if needs_K4:
+            info_lines.append(f"• Using **K=4 error mics** at ±{int(head_zone_cm)} cm around headrest")
+        if mimo_mode == 'Stage 3 Full MIMO (N×M×K)':
+            if ref_mic_mode != '4-Reference Mic System':
+                info_lines.append("• Auto-enabled **4-Reference Mic System**")
+            info_lines.append("• Recommend **step size ≤ 0.001** for stability")
+
+        if info_lines:
+            st.sidebar.info("\n".join(info_lines))
+
+        # Show summary of current MIMO config
+        N = 4 if mimo_mode == 'Stage 3 Full MIMO (N×M×K)' else 1
+        M = 4
+        K = 4 if needs_K4 else 1
+        L = params['filter_length']
+        st.sidebar.caption(
+            f"📐 Config: N={N} ref · M={M} spk · K={K} err mics — "
+            f"{N*M*L if mimo_mode == 'Stage 3 Full MIMO (N×M×K)' else M*L} weights"
+        )
 
     # ==================== Simulation Settings ====================
     st.sidebar.header("⏱️ Simulation")
