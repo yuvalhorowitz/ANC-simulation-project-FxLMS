@@ -1,0 +1,360 @@
+{
+  "config": {
+    "speakers": {
+      "door_L": [
+        2.0,
+        0.1,
+        0.4
+      ],
+      "door_R": [
+        2.0,
+        1.75,
+        0.4
+      ],
+      "dash_L": [
+        0.8,
+        0.25,
+        0.9
+      ],
+      "dash_R": [
+        0.8,
+        1.6,
+        0.9
+      ]
+    },
+    "base_params": {
+      "dimensions": [
+        4.5,
+        1.85,
+        1.2
+      ],
+      "absorption": 0.35,
+      "max_order": 3,
+      "filter_length": 512,
+      "step_size": 0.003,
+      "leakage": 0.0,
+      "sample_rate": 16000,
+      "scenario": "highway"
+    },
+    "positions": {
+      "noise_source": [
+        0.5,
+        0.92,
+        0.4
+      ],
+      "reference_mic": [
+        1.1,
+        0.92,
+        0.8
+      ],
+      "speaker": [
+        0.8,
+        0.25,
+        0.9
+      ],
+      "error_mic": [
+        2.5,
+        0.55,
+        1.05
+      ]
+    }
+  },
+  "results": [
+    {
+      "recording": "Real Car 1",
+      "audio_file": "real_noises/realcar1.wav",
+      "duration": 30.0,
+      "siso": {
+        "nr_db": 2.0501330224875094,
+        "conv_time": 0.765625,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 6.361238293903786,
+        "conv_time": 0.296875,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 7.629100400029099,
+        "conv_time": 0.25,
+        "stable": true
+      },
+      "delta_vs_siso": 5.57896737754159,
+      "delta_vs_pseudo": 1.267862106125313
+    },
+    {
+      "recording": "Real Car 2",
+      "audio_file": "real_noises/realcar2.wav",
+      "duration": 13.0,
+      "siso": {
+        "nr_db": 1.183626227409241,
+        "conv_time": 0.40625,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 6.620570426759764,
+        "conv_time": 0.90625,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 7.812293402856824,
+        "conv_time": 0.53125,
+        "stable": true
+      },
+      "delta_vs_siso": 6.628667175447583,
+      "delta_vs_pseudo": 1.1917229760970596
+    },
+    {
+      "recording": "Real Car 3",
+      "audio_file": "real_noises/realcar3.wav",
+      "duration": 18.0,
+      "siso": {
+        "nr_db": 0.9279761002034342,
+        "conv_time": 0.796875,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 6.163584178905133,
+        "conv_time": 0.28125,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 7.868127296111055,
+        "conv_time": 0.46875,
+        "stable": true
+      },
+      "delta_vs_siso": 6.940151195907621,
+      "delta_vs_pseudo": 1.7045431172059224
+    },
+    {
+      "recording": "Real Car 4",
+      "audio_file": "real_noises/realcar4.wav",
+      "duration": 14.0,
+      "siso": {
+        "nr_db": 4.031868489952076,
+        "conv_time": 0.609375,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 8.650050572782263,
+        "conv_time": 0.953125,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 8.925966725345994,
+        "conv_time": 0.953125,
+        "stable": true
+      },
+      "delta_vs_siso": 4.894098235393918,
+      "delta_vs_pseudo": 0.27591615256373103
+    },
+    {
+      "recording": "Real Car 5",
+      "audio_file": "real_noises/realcar5.wav",
+      "duration": 25.0,
+      "siso": {
+        "nr_db": 0.7804518370063923,
+        "conv_time": 0.109375,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 6.378070032200181,
+        "conv_time": 0.296875,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 7.095993419951158,
+        "conv_time": 0.890625,
+        "stable": true
+      },
+      "delta_vs_siso": 6.315541582944766,
+      "delta_vs_pseudo": 0.717923387750977
+    },
+    {
+      "recording": "LA City Start",
+      "audio_file": "real_noises/la_city_start.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 1.442337306661823,
+        "conv_time": 2.375,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 3.729167924246144,
+        "conv_time": 0.796875,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 3.583182250356944,
+        "conv_time": 1.640625,
+        "stable": true
+      },
+      "delta_vs_siso": 2.1408449436951207,
+      "delta_vs_pseudo": -0.14598567388920003
+    },
+    {
+      "recording": "LA Stop & Go",
+      "audio_file": "real_noises/la_city_stop_go.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 0.3306456747028124,
+        "conv_time": 1.734375,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 3.5788439667663314,
+        "conv_time": 0.84375,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 3.640813045594653,
+        "conv_time": 3.078125,
+        "stable": true
+      },
+      "delta_vs_siso": 3.3101673708918407,
+      "delta_vs_pseudo": 0.06196907882832159
+    },
+    {
+      "recording": "LA Quiet Cruise",
+      "audio_file": "real_noises/la_quiet_cruise.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 0.9535660756567348,
+        "conv_time": 1.4375,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 4.520107132041051,
+        "conv_time": 3.625,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 4.892277330440643,
+        "conv_time": 3.671875,
+        "stable": true
+      },
+      "delta_vs_siso": 3.9387112547839083,
+      "delta_vs_pseudo": 0.37217019839959153
+    },
+    {
+      "recording": "LA Idle",
+      "audio_file": "real_noises/la_idle.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 1.5933624283794,
+        "conv_time": 1.15625,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 5.315641845347203,
+        "conv_time": 0.25,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 6.148425416192566,
+        "conv_time": 0.984375,
+        "stable": true
+      },
+      "delta_vs_siso": 4.555062987813166,
+      "delta_vs_pseudo": 0.832783570845363
+    },
+    {
+      "recording": "LA Varying",
+      "audio_file": "real_noises/la_varying.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 0.9612865147952672,
+        "conv_time": 0.484375,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 4.214898651575874,
+        "conv_time": 0.03125,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 5.050677241245316,
+        "conv_time": 0.46875,
+        "stable": true
+      },
+      "delta_vs_siso": 4.089390726450048,
+      "delta_vs_pseudo": 0.8357785896694416
+    },
+    {
+      "recording": "LA Medium Cruise",
+      "audio_file": "real_noises/la_medium_cruise.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 0.8089510986041699,
+        "conv_time": 0.90625,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 4.099120496947839,
+        "conv_time": 1.40625,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 4.124318463328443,
+        "conv_time": 2.4375,
+        "stable": true
+      },
+      "delta_vs_siso": 3.315367364724273,
+      "delta_vs_pseudo": 0.025197966380603454
+    },
+    {
+      "recording": "LA Loud Low",
+      "audio_file": "real_noises/la_loud_low.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 2.2696096729624236,
+        "conv_time": 1.453125,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 3.6129271787700974,
+        "conv_time": 0.34375,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 3.425147110389526,
+        "conv_time": 1.03125,
+        "stable": true
+      },
+      "delta_vs_siso": 1.1555374374271024,
+      "delta_vs_pseudo": -0.18778006838057149
+    },
+    {
+      "recording": "LA Late Drive",
+      "audio_file": "real_noises/la_late_drive.wav",
+      "duration": 20.0,
+      "siso": {
+        "nr_db": 0.42433470114473937,
+        "conv_time": 0.921875,
+        "stable": true
+      },
+      "pseudo_mimo": {
+        "nr_db": 4.716154219855603,
+        "conv_time": 0.40625,
+        "stable": true
+      },
+      "true_mimo": {
+        "nr_db": 4.840738022249331,
+        "conv_time": 1.171875,
+        "stable": true
+      },
+      "delta_vs_siso": 4.416403321104592,
+      "delta_vs_pseudo": 0.12458380239372868
+    }
+  ],
+  "summary": {
+    "mean_siso_db": 1.3660114730743098,
+    "mean_pseudo_db": 5.227721147700098,
+    "mean_mimo_db": 5.772081548007042,
+    "mean_delta_vs_siso": 4.406070074932733,
+    "mean_delta_vs_pseudo": 0.5443604003069447,
+    "wins_vs_siso": 13,
+    "wins_vs_pseudo": 11,
+    "total_stable": 13
+  }
+}
