@@ -288,8 +288,12 @@ EXPLANATIONS = {
 
 
 def draw_one_panel(ax, grid, title, speakers, error_mics, vmax, extent,
-                    show_axis_labels=True):
-    """Draw a single cabin heatmap panel."""
+                    show_axis_labels=True, ref_mics=None):
+    """Draw a single cabin heatmap panel.
+
+    ref_mics: list of [x, y, z] positions to plot as green triangles.
+              If None, defaults to a single triangle at REF_MIC_POS.
+    """
     im = ax.imshow(grid, origin='lower', extent=extent,
                    cmap='RdBu', vmin=-vmax, vmax=vmax,
                    interpolation='nearest', aspect='equal')
@@ -307,7 +311,12 @@ def draw_one_panel(ax, grid, title, speakers, error_mics, vmax, extent,
                            edgecolor='gray', linestyle='--', linewidth=0.6, alpha=0.7))
 
     ax.plot(NOISE_POS[0], NOISE_POS[1], 'r*', markersize=12, mec='black', mew=0.5, label='noise')
-    ax.plot(REF_MIC_POS[0], REF_MIC_POS[1], 'g^', markersize=9, mec='black', mew=0.5, label='ref mic')
+
+    # Reference mic(s) — varies per algorithm
+    rms = ref_mics if ref_mics is not None else [REF_MIC_POS]
+    for rm in rms:
+        ax.plot(rm[0], rm[1], 'g^', markersize=9, mec='black', mew=0.5)
+
     for em in error_mics:
         ax.plot(em[0], em[1], 'kX', markersize=11, mec='white', mew=0.5)
     for spk in speakers:
@@ -325,7 +334,7 @@ def draw_one_panel(ax, grid, title, speakers, error_mics, vmax, extent,
 
 
 def save_individual_panel(grid, label, speakers, error_mics, vmax_global,
-                          extent, audio_name):
+                          extent, audio_name, ref_mics=None):
     """One algorithm → one PNG with figure + explanation text."""
     explanation = EXPLANATIONS[label]
 
@@ -338,7 +347,7 @@ def save_individual_panel(grid, label, speakers, error_mics, vmax_global,
     im = draw_one_panel(
         ax_map, grid,
         f"{label}\n(trained on {audio_name})",
-        speakers, error_mics, vmax_local, extent
+        speakers, error_mics, vmax_local, extent, ref_mics=ref_mics,
     )
 
     cbar = fig.colorbar(im, ax=ax_map, fraction=0.046, pad=0.02)
@@ -377,7 +386,7 @@ def save_individual_panel(grid, label, speakers, error_mics, vmax_global,
 
 
 def save_combined_1x5(grids, labels, speakers_per, err_mics_per, extent,
-                      audio_name):
+                      audio_name, ref_mics_per=None):
     """Combined 1×5 PNG (wide layout)."""
     vmax = max(np.max(np.abs(g)) for g in grids)
     vmax = max(vmax, 5)
@@ -388,9 +397,11 @@ def save_combined_1x5(grids, labels, speakers_per, err_mics_per, extent,
     im = None
     for col in range(5):
         ax = fig.add_subplot(gs[0, col])
+        rms = ref_mics_per[col] if ref_mics_per else None
         im = draw_one_panel(ax, grids[col], labels[col],
                             speakers_per[col], err_mics_per[col],
-                            vmax, extent, show_axis_labels=(col == 0))
+                            vmax, extent, show_axis_labels=(col == 0),
+                            ref_mics=rms)
 
     cax = fig.add_subplot(gs[:, 5])
     cbar = fig.colorbar(im, cax=cax)
@@ -408,39 +419,43 @@ def save_combined_1x5(grids, labels, speakers_per, err_mics_per, extent,
 
 
 def save_combined_221(grids, labels, speakers_per, err_mics_per, extent,
-                       audio_name):
+                       audio_name, ref_mics_per=None):
     """Combined 2-2-1 square-ish PNG: baselines / SIMO / Full MIMO."""
     vmax = max(np.max(np.abs(g)) for g in grids)
     vmax = max(vmax, 5)
 
-    # 3 rows × 4 cols (gives 2/2/1 by spanning bottom panel across cols 1-2,
-    # which we approximate by using col 1 only — Stage 3 sits centered)
-    # We'll use 3 rows × 2 cols + a vertical colorbar
     fig = plt.figure(figsize=(15, 14))
     gs = fig.add_gridspec(3, 3, width_ratios=[1, 1, 0.04],
                           hspace=0.30, wspace=0.18)
+
+    rms_for = lambda i: (ref_mics_per[i] if ref_mics_per else None)
 
     im = None
     # Row 0: SISO, Pseudo-SIMO
     ax = fig.add_subplot(gs[0, 0])
     im = draw_one_panel(ax, grids[0], labels[0], speakers_per[0],
-                        err_mics_per[0], vmax, extent, show_axis_labels=True)
+                        err_mics_per[0], vmax, extent, show_axis_labels=True,
+                        ref_mics=rms_for(0))
     ax = fig.add_subplot(gs[0, 1])
     im = draw_one_panel(ax, grids[1], labels[1], speakers_per[1],
-                        err_mics_per[1], vmax, extent, show_axis_labels=False)
+                        err_mics_per[1], vmax, extent, show_axis_labels=False,
+                        ref_mics=rms_for(1))
 
     # Row 1: Stage 1, Stage 2
     ax = fig.add_subplot(gs[1, 0])
     im = draw_one_panel(ax, grids[2], labels[2], speakers_per[2],
-                        err_mics_per[2], vmax, extent, show_axis_labels=True)
+                        err_mics_per[2], vmax, extent, show_axis_labels=True,
+                        ref_mics=rms_for(2))
     ax = fig.add_subplot(gs[1, 1])
     im = draw_one_panel(ax, grids[3], labels[3], speakers_per[3],
-                        err_mics_per[3], vmax, extent, show_axis_labels=False)
+                        err_mics_per[3], vmax, extent, show_axis_labels=False,
+                        ref_mics=rms_for(3))
 
     # Row 2: Stage 3 — centered (span both columns)
     ax = fig.add_subplot(gs[2, :2])
     im = draw_one_panel(ax, grids[4], labels[4], speakers_per[4],
-                        err_mics_per[4], vmax, extent, show_axis_labels=True)
+                        err_mics_per[4], vmax, extent, show_axis_labels=True,
+                        ref_mics=rms_for(4))
 
     # Single shared colorbar on the right
     cax = fig.add_subplot(gs[:, 2])
@@ -538,6 +553,15 @@ def main():
     speakers_per = [[SISO_SPEAKER]] + [list(FOUR_SPEAKERS.values())] * 4
     err_mics_per = [[ERROR_MIC_POS], [ERROR_MIC_POS], [ERROR_MIC_POS],
                     ERROR_MICS_K4, ERROR_MICS_K4]
+    # Reference mics: SISO/Pseudo/Stage1/Stage2 use the single legacy ref mic;
+    # Stage 3 uses the 4 mics from FOUR_REF_MICS (firewall, floor, a-pillar, dashboard).
+    ref_mics_per = [
+        [REF_MIC_POS],                          # SISO
+        [REF_MIC_POS],                          # Pseudo-SIMO
+        [REF_MIC_POS],                          # Stage 1 SIMO
+        [REF_MIC_POS],                          # Stage 2 SIMO+multi-err
+        list(FOUR_REF_MICS.values()),           # Stage 3: N=4 ref mics
+    ]
 
     extent = [0, ROOM_DIMS[0], 0, ROOM_DIMS[1]]
     audio_name = Path(AUDIO_FILE).name
@@ -550,7 +574,8 @@ def main():
             '1 spk, 1 err mic', '4 spk broadcast', '4 spk indep',
             '4 spk + 4 err', '4 ref + 4 spk + 4 err'
         ])
-    ], speakers_per, err_mics_per, extent, audio_name)
+    ], speakers_per, err_mics_per, extent, audio_name,
+       ref_mics_per=ref_mics_per)
 
     print("\nGenerating combined 2-2-1 square heatmap...")
     save_combined_221(grids, [
@@ -558,11 +583,14 @@ def main():
             '1 spk, 1 err mic', '4 spk broadcast', '4 spk indep',
             '4 spk + 4 err', '4 ref + 4 spk + 4 err'
         ])
-    ], speakers_per, err_mics_per, extent, audio_name)
+    ], speakers_per, err_mics_per, extent, audio_name,
+       ref_mics_per=ref_mics_per)
 
     print("\nGenerating 5 individual heatmaps...")
-    for grid, label, spks, ems in zip(grids, labels, speakers_per, err_mics_per):
-        save_individual_panel(grid, label, spks, ems, None, extent, audio_name)
+    for grid, label, spks, ems, rms in zip(grids, labels, speakers_per,
+                                            err_mics_per, ref_mics_per):
+        save_individual_panel(grid, label, spks, ems, None, extent, audio_name,
+                              ref_mics=rms)
 
     # Summary
     print("\n" + "=" * 80)
