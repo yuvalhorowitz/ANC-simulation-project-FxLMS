@@ -6,14 +6,7 @@ Repository URL: https://github.com/[user-to-fill]/ANC-simulation-project-FxLMS
 
 ## Repository layout
 
-- `src/core/` — algorithm implementations: `fxlms.py` (scalar FxNLMS) and `mimo_fxnlms*.py` (Stages 1, 2, 3).
-- `src/acoustic/`, `src/noise/`, `src/ml/` — acoustic-path extraction, real-noise loading, and ML code (the TCN and the four step-size classifiers).
-- `simulations_pyroom/` — incremental simulator scripts (`step1` through `step8`) plus the Stage 1–3 MIMO evaluation scripts that produced the JSON files in `output/data/mimo/`.
-- `scripts/plots/` — plot-generation scripts for every figure in this report.
-- `scripts/book/` — this report's generation pipeline (`build_book.py` plus the per-chapter `.md` files in `scripts/book/content/`).
-- `playground/` — an interactive Streamlit application (`playground/app.py`) that exposes the full controller stack with a graphical interface.
-- `output/` — generated artefacts: plots in `output/plots/`, JSON evaluation results in `output/data/`, audio renderings in `output/audio/`, and this report in `output/book/`.
-- `docs/` — narrative documentation used as primary source material for this report (notably `mimo_results.md`, `ml_journey.md`, `position_optimization.md`, `fxlms_explained.md`).
+![Top-level directory layout of the project repository](output/plots/book/repo_layout.png)
 
 ## How to reproduce the figures and the report
 
